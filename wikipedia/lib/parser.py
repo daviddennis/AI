@@ -1,6 +1,7 @@
 from nltk.corpus import stopwords
 from annoying.functions import get_object_or_None
-from wikipedia.models import Concept, Connection, StopwordSequence, Stopword
+from wikipedia.models import Concept, Connection, StopwordSequence, Stopword, Punctuation, Verb
+import string
 import sys
 
 stop_words = set([x.upper() for x in stopwords.words('english')])
@@ -10,7 +11,7 @@ class Parser():
     def __init__(self):
         pass
 
-    def parse(self, latest):
+    def parse(self, latest, tags=None):
         before = []
         remaining = latest
         success = None
@@ -22,15 +23,25 @@ class Parser():
                     before += [items[0]]
                     remaining = items[1:]                     
                 else:
-                    items, success = self.parse_concept(item)
+                    items, success = self.parse_punctuation(item)
                     if success:
                         before += [items[0]]
                         remaining = items[1:]
                     else:
-                        subitems = self.tokenize(items[0])
-                        before += [subitems[0]]
-                        remaining += [' '.join(subitems[1:])]
-                        
+                        items, success = self.parse_verb(item, tags)
+                        if success:
+                            before += [items[0]]
+                            remaining = items[1:]
+                        else:                            
+                            items, success = self.parse_concept(item)
+                            if success:
+                                before += [items[0]]
+                                remaining = items[1:]
+                            else:
+                                subitems = self.tokenize(items[0])
+                                before += [subitems[0]]
+                                remaining += [' '.join(subitems[1:])]
+            
             if remaining == ['']:
                 break
             else:
@@ -88,6 +99,29 @@ class Parser():
         else:
             return ([string], False)
     
+    def parse_punctuation(self, item):
+        tokens = self.tokenize(item)
+        if tokens[0] in string.punctuation:
+            return ([Punctuation(tokens[0])] + [' '.join(tokens[1:])], True)
+        else:
+            return ([item], False)
+
+    def parse_verb(self, item, tags):
+        tokens = self.tokenize(item)
+        if not tags:
+            return ([tokens[0]] + [' '.join(tokens[1:])], False)
+        import en
+        verb = None
+        for word, pos_tag in tags:
+            if 'V' in pos_tag:
+                if word == tokens[0]:
+                    verb_or_none = get_object_or_None(Verb, name=en.verb.present(word.lower()))
+                    if verb_or_none:
+                        verb = verb_or_none
+        if verb:
+            return ([verb] + [' '.join(tokens[1:])], True)
+        else:
+            return ([tokens[0]] + [' '.join(tokens[1:])], False)
 
     def remove_parentheses(self, sentence):
         new_text = ""
@@ -102,39 +136,20 @@ class Parser():
             new_text += c
         return new_text
 
+    def space_punctuation(self, sentence):
+        new_sentence = ""
+        for i,c in enumerate(sentence):
+            if c in string.punctuation:
+                if i != 0:
+                    new_sentence += " "
+                new_sentence += "%s " % c
+            else:
+                new_sentence += c
 
+        for i in range(10): 
+            if '  ' in new_sentence:
+                new_sentence = ' '.join(new_sentence.split('  '))
+            else:
+                break
 
-    # def parse(self, latest):
-    #     before = []
-    #     remaining = after = latest
-    #     last_was_concept = False
-    #     success = None
-    #     while len(remaining) > 0:
-    #         item = remaining.pop()
-    #         if isinstance(item, str):
-    #             if last_was_concept:
-    #                 items, success = self.parse_stopword_sequence(item)
-    #                 last_was_concept = False
-    #             else:
-    #                 items, success = self.parse_concept(item)
-    #                 #success = True
-    #                 # if not success:
-    #                 #     subitems = self.tokenize(items[0])
-    #                 #     if isinstance(before[-1], str):
-    #                 #         if len(subitems) > 0:
-    #                 #             before, items = self.append_word(before, subitems)
-    #                 #     else:
-    #                 #         before += [subitems[0]]
-    #                 #         if subitems[1:]:
-    #                 #             items = [' '.join(subitems[1:])]
-    #                 last_was_concept = True
-
-    #             if success:
-    #                 before += [items[0]]
-    #                 after = items[1:] + remaining            
-    #             else:
-    #                 after = items + remaining
-
-    #         remaining = after
-    #         latest = before + after
-    #     return latest
+        return new_sentence

@@ -1,4 +1,4 @@
-from wikipedia.models import Concept, Connection, StopwordSequence
+from wikipedia.models import Concept, Connection, StopwordSequence, Verb
 from wikipedia.lib.parser import Stopword
 
 class PatternRecognizer():
@@ -11,6 +11,9 @@ class PatternRecognizer():
         for i, arg in enumerate(args):
             arg = arg.strip()
             item = item_list[i]
+            if arg.upper() == "VERB":
+                if not isinstance(item, Verb):
+                    return False
             if arg.upper() == "CONCEPT":
                 if not isinstance(item, Concept):
                     return False

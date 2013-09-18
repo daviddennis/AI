@@ -1,4 +1,5 @@
 from wikipedia.models import StopwordSequence, Concept, Assertion
+from wikipedia.lib.english_customs import a_form
 
 class NLPGenerator():
     
@@ -20,10 +21,13 @@ class NLPGenerator():
         tokens = []
 
         for item in thought_parse['sentence']:
+            if isinstance(item, str):
+                tokens += [item]
             if isinstance(item, Assertion):
+                tokens += [a_form(item.concept1.name)]
                 if item.relation.name == "IsA":
-                    link_words = ['is','a']
-                tokens += ['A'] + [item.concept1.name] + link_words + [item.concept2.name]
+                    link_words = ['is'] + [a_form(item.concept2.name)]
+                tokens += [item.concept1.name] + link_words + [item.concept2.name]
                 
         return tokens
 

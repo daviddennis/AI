@@ -1,7 +1,7 @@
 from wikipedia.lib.parser import Parser, Stopword
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.group_manager import GroupManager
-from wikipedia.models import Concept, Connection, StopwordSequence, Group, GroupInstance
+from wikipedia.models import Concept, Connection, StopwordSequence, Group, GroupInstance, Verb, VerbConstruct
 import sys
 from annoying.functions import get_object_or_None
 
@@ -14,9 +14,10 @@ class Interpreter():
         self.pr = PatternRecognizer()
         self.group_mgr = GroupManager()
 
-    def interpret(self, parsed_sentence, last_transform=None):
-        #print parsed_sentence
+    def interpret(self, parsed_sentence, last_transform=None, thinker=None):
+        print parsed_sentence
         item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
+        thought = None
         for i, item_group in enumerate(item_groups):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+3:]
@@ -24,6 +25,10 @@ class Interpreter():
                 concept = item_group[0]
                 if concept.name.startswith("the".upper()):
                     self.the(item_group[0], before, list(item_group[1:]) + after)
+            #if self.pr.recognize(item_group, 'PUNC:" CONCEPT PUNC:"'):
+            #    self.quotes(item_group, before, after, thinker)
+            if self.pr.recognize(item_group, "CONCEPT VERB"):
+                self._verb(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS CONCEPT"):
                 stopword_sequence = item_group[1]
                 if stopword_sequence.string.upper() == "is the".upper():
@@ -38,11 +43,30 @@ class Interpreter():
                     self.of(item_group, before, after)
                 if stopword.string.upper() == "have".upper():
                     self.has(item_group, before, after)
-        return parsed_sentence
+        return thought
+
+    def _verb(self, triple, before, after):
+        concept1, verb, x = triple
+        if isinstance(x, Stopword):
+            if isinstance(after[0], Concept):
+                concept2 = after[0]
+            else:
+                return
+        else:
+            concept2 = x
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+                    concept1=concept1,
+                    verb=verb,
+                    concept2=concept2)
+        print verb_construct
 
     def is_a(self, triple, before, after):
         concept = triple[0]
         concept_category = triple[2]
+
+        if concept == concept_category:
+            return
+            
         concept.category = concept_category
         concept.save()
         self.interpret(before + [concept] + after, last_transform="is_a")

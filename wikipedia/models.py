@@ -69,9 +69,32 @@ class Assertion(models.Model):
     relation = models.ForeignKey(Relation)
     concept1 = models.ForeignKey(Concept, related_name="assertion_1_set")
     concept2 = models.ForeignKey(Concept, related_name="assertion_2_set")
+    score = models.IntegerField(null=True, blank=True)
+    frequency = models.FloatField(null=True, blank=True)
     
     def __unicode__(self):
         return "%s %s %s" % (self.concept1, self.relation, self.concept2)
+
+class Verb(models.Model):
+    name = models.CharField(max_length=500)
+    
+    def __unicode__(self):
+        return "%s" % (self.name)
+
+class VerbConstruct(models.Model):
+    concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
+    verb = models.ForeignKey(Verb)
+    concept2 = models.ForeignKey(Concept, related_name="verb_2_set", null=True, blank=True)
+
+    def __unicode__(self):
+        if self.concept1 and self.concept2:
+            return "%s(%s, %s)" % (self.verb.name, self.concept1.name, self.concept2.name)
+        else:
+            return "%s(%s)" % (self.verb.name, (self.concept1 or self.concept2).name)
+
+class IfStmt(models.Model):
+    vc1 = models.ForeignKey(VerbConstruct, related_name="if_1_set", null=True, blank=True)
+    vc2 = models.ForeignKey(VerbConstruct, related_name="if_2_set", null=True, blank=True)
 
 # Non-table models
 class Stopword():
@@ -79,4 +102,13 @@ class Stopword():
         self.string = stopword
 
     def __repr__(self):
-        return self.string
+        return 'Stopword: %s' % self.string
+
+class Punctuation():
+    def __init__(self, punctuation):
+        self.string = punctuation
+
+    def __repr__(self):
+        return 'Punctuation: %s' % self.string
+
+    

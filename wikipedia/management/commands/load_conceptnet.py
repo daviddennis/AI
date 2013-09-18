@@ -11,7 +11,7 @@ class Command(BaseCommand):
             csvreader = reversed(list(csv.reader(assertion_file)))
             #i = 0
             for row in csvreader:
-                concept1_name, relation_name, concept2_name = tuple(row)
+                concept1_name, relation_name, concept2_name, score, frequency = tuple(row)
                 relation, created = Relation.objects.get_or_create(name=relation_name)
                 if created:
                     print 'Created %s' % relation_name
@@ -21,7 +21,9 @@ class Command(BaseCommand):
                     assertion, created = Assertion.objects.get_or_create(
                         relation=relation,
                         concept1=concept1,
-                        concept2=concept2)
+                        concept2=concept2,
+                        score=score,
+                        frequency=frequency)
                     if created:
                         print 'Created %s' % assertion
                 

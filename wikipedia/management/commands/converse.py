@@ -6,7 +6,8 @@ from wikipedia.lib.query_mgr import QueryManager
 from wikipedia.lib.nlp_gen import NLPGenerator
 from sys import stdout
 from time import sleep
-
+import sys
+from text.blob import TextBlob
 
 class Command(BaseCommand):
 
@@ -18,41 +19,52 @@ class Command(BaseCommand):
         query_mgr = QueryManager()
         nlp_generator =  NLPGenerator()
 
-        #tb = TextBlob(sentence)
-        #tags = tb.tags
+        print 'Loading en...'
+        import en
 
-        print 'Hello'
+        print '\nHello\n'
         text = ''
         
         while True:
             print '> ',
             text = raw_input().upper()
-            if text.lower() in ('bye', 'off', 'later', 'cya', 'end', 'e', 'goodbye'):
+            if text.lower() in ('bye', 'off', 'later', 'cya', 'end', 'e', 'goodbye', 'exit'):
                 break
+
+            # tb = TextBlob(text)
+            # tags = tb.tags
+            # print tags
+            tags = None
+            #tags = [('MARY', 'NN'), ('WALK', 'VBD'), ('TO', 'TO'), ('SCHOOL', 'NN')]
+            tags = [(word.upper(), pos_tag) for word, pos_tag in en.sentence.tag(text)]
             
-            # if 'WHAT IS' in text or 'WHAT ARE' in text:
-            #     tokens = interpreter.parser.tokenize(text)
-            #     item_name = tokens[-1]
-            #     if item_name in self.computer_mind:
-            #         print '%s is %s' % (item_name, self.computer_mind[item_name])
-            #         continue
-
             sentence = interpreter.parser.remove_parentheses(text)
+            sentence = interpreter.parser.space_punctuation(sentence)
             latest = [sentence]
-            latest = interpreter.parser.parse(latest)
+            latest = interpreter.parser.parse(latest, tags=tags)
+            #print latest
 
-            interpreter.interpret(latest)
             #self.store_concepts(latest)
 
             if query_mgr.is_query(latest):
+                print ':Query'
                 query = query_mgr.construct_query(latest)
                 answer = query_mgr.process_query(query)
                 answer_sentence = nlp_generator.deparse(answer)
                 print '\n:: %s\n' % (answer_sentence)
-
-        print '\ngoodbye.\n'
+            else:
+                print ':Instruction'
+                thought = interpreter.interpret(latest, thinker=self)
+                #print thought,'>'
+                if thought:
+                    self.add_thought(thought)
+                
+        print '\nGoodbye.\n'
         return
 
+    
+    def add_thought(self, thought):
+        self.my_mind[thought[0].name] = thought[1]
 
     def store_concepts(self, parsed_sentence):
         for item in parsed_sentence:
