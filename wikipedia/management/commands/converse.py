@@ -4,6 +4,7 @@ from wikipedia.lib.parser import Parser, Stopword
 from wikipedia.lib.interpreter import Interpreter
 from wikipedia.lib.query_mgr import QueryManager
 from wikipedia.lib.nlp_gen import NLPGenerator
+from wikipedia.lib.causation import CausationManager
 from sys import stdout
 from time import sleep
 import sys
@@ -18,9 +19,13 @@ class Command(BaseCommand):
         interpreter = Interpreter()
         query_mgr = QueryManager()
         nlp_generator =  NLPGenerator()
+        causation = CausationManager()
 
-        print 'Loading en...'
-        import en
+        interpreter.causation = causation
+
+        if 'verbs' in args:
+            print 'Loading en...'
+            import en
 
         print '\nHello\n'
         text = ''
@@ -34,30 +39,35 @@ class Command(BaseCommand):
             # tb = TextBlob(text)
             # tags = tb.tags
             # print tags
-            tags = None
             #tags = [('MARY', 'NN'), ('WALK', 'VBD'), ('TO', 'TO'), ('SCHOOL', 'NN')]
-            tags = [(word.upper(), pos_tag) for word, pos_tag in en.sentence.tag(text)]
+            try:
+                tags = [(word.upper(), pos_tag) for word, pos_tag in en.sentence.tag(text)]
+            except:
+                tags = None
             
             sentence = interpreter.parser.remove_parentheses(text)
             sentence = interpreter.parser.space_punctuation(sentence)
-            latest = [sentence]
-            latest = interpreter.parser.parse(latest, tags=tags)
-            #print latest
+            sentence_list = [sentence]
+            parsed_sentence = interpreter.parser.parse(sentence_list, tags=tags)
 
             #self.store_concepts(latest)
 
-            if query_mgr.is_query(latest):
+            if query_mgr.is_query(parsed_sentence):
                 print ':Query'
-                query = query_mgr.construct_query(latest)
+                query = query_mgr.construct_query(parsed_sentence)
                 answer = query_mgr.process_query(query)
                 answer_sentence = nlp_generator.deparse(answer)
                 print '\n:: %s\n' % (answer_sentence)
+            elif causation.is_if_statement(parsed_sentence):
+                print ':Instruction'
+                if_stmt = interpreter.process_if(parsed_sentence, causation=causation)
+                print '\n:: %s\n' % (if_stmt)
             else:
                 print ':Instruction'
-                thought = interpreter.interpret(latest, thinker=self)
-                #print thought,'>'
-                if thought:
-                    self.add_thought(thought)
+                thought = interpreter.interpret(parsed_sentence, thinker=self)
+                print thought
+                #if thought:
+                #    self.add_thought(thought)
                 
         print '\nGoodbye.\n'
         return

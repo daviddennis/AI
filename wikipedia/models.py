@@ -94,7 +94,14 @@ class VerbConstruct(models.Model):
 
 class IfStmt(models.Model):
     vc1 = models.ForeignKey(VerbConstruct, related_name="if_1_set", null=True, blank=True)
+    assertion1 = models.ForeignKey(Assertion, related_name="if_1_ass_set", null=True, blank=True)
     vc2 = models.ForeignKey(VerbConstruct, related_name="if_2_set", null=True, blank=True)
+    assertion2 = models.ForeignKey(Assertion, related_name="if_2_ass_set", null=True, blank=True)
+
+    def __unicode__(self):
+        arg1 = self.vc1 or self.assertion1
+        arg2 = self.vc2 or self.assertion2
+        return "IF %s THEN %s" % (arg1, arg2)
 
 # Non-table models
 class Stopword():

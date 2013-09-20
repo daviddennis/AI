@@ -9,18 +9,34 @@ class PatternRecognizer():
     def recognize(self, item_list, pattern):
         args = pattern.split(' ')
         for i, arg in enumerate(args):
-            arg = arg.strip()
+            arg = arg.strip().upper()
             item = item_list[i]
-            if arg.upper() == "VERB":
-                if not isinstance(item, Verb):
+            if arg.startswith("STRING"):
+                if not isinstance(item, str):
                     return False
-            if arg.upper() == "CONCEPT":
-                if not isinstance(item, Concept):
+                continue
+            if arg.startswith("VERB"):
+                if isinstance(item, Verb):
+                    if ':' in arg:
+                        if item.name != arg.split(':')[1]:
+                            return False
+                else:
                     return False
-            if arg.upper() == "SWS":
+                continue
+            if arg.startswith("CONCEPT"):
+                if isinstance(item, Concept):
+                    if ':' in arg:
+                        if item.name != arg.split(':')[1]:
+                            return False
+                else:
+                    return False
+                continue
+            if arg.startswith("SWS"):
                 if not isinstance(item, StopwordSequence):
                     return False
-            if arg.upper() == "SW":
+                continue
+            if arg.startswith("SW"):
                 if not isinstance(item, Stopword):
                     return False
+                continue
         return True

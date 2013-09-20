@@ -1,7 +1,9 @@
 from wikipedia.lib.parser import Parser, Stopword
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.group_manager import GroupManager
-from wikipedia.models import Concept, Connection, StopwordSequence, Group, GroupInstance, Verb, VerbConstruct
+from wikipedia.models import (Concept, Connection, StopwordSequence, Group, 
+                              GroupInstance, Verb, VerbConstruct, Assertion,
+                              Relation, IfStmt)
 import sys
 from annoying.functions import get_object_or_None
 
@@ -15,6 +17,8 @@ class Interpreter():
         self.group_mgr = GroupManager()
 
     def interpret(self, parsed_sentence, last_transform=None, thinker=None):
+        if thinker:
+            self.thinker = thinker
         print parsed_sentence
         item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
         thought = None
@@ -27,24 +31,71 @@ class Interpreter():
                     self.the(item_group[0], before, list(item_group[1:]) + after)
             #if self.pr.recognize(item_group, 'PUNC:" CONCEPT PUNC:"'):
             #    self.quotes(item_group, before, after, thinker)
+            if self.pr.recognize(item_group, "VERB:add CONCEPT:concept STRING"):
+                self.add_concept(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT VERB"):
-                self._verb(item_group, before, after)
+                thought = self._verb(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS CONCEPT"):
                 stopword_sequence = item_group[1]
                 if stopword_sequence.string.upper() == "is the".upper():
                     self.is_the(item_group, before, after)
                 if stopword_sequence.string.upper() == "is a".upper():
-                    self.is_a(item_group, before, after)
+                    thought = self.is_a(item_group, before, after)
                 if stopword_sequence.string.upper() in group_stopword_seqs:
                     self.on_the(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SW CONCEPT"):
                 stopword = item_group[1]
+                if stopword.string.upper() == "is".upper():
+                    thought = self._is(item_group, before, after)
                 if stopword.string.upper() == "of".upper():
                     self.of(item_group, before, after)
                 if stopword.string.upper() == "have".upper():
                     self.has(item_group, before, after)
         return thought
 
+    def process_if(self, parsed_sentence, causation=None):
+        if causation:
+            self.causation = causation
+        statement1 = []
+        statement2 = []
+        then_index = None
+        for i, item in enumerate(parsed_sentence[1:]):
+            if isinstance(item, Stopword):
+                if item.string.upper() == "then".upper():
+                    then_index = i
+                    break
+            statement1 += [item]
+        for item in parsed_sentence[then_index+2:]:
+            statement2 += [item]
+        assertion = self.interpret(statement1)
+        verb_construct = self.interpret(statement2)
+
+        if_stmt, created = IfStmt.objects.get_or_create(
+            assertion1=assertion,
+            vc2=verb_construct)
+
+        print if_stmt
+        return if_stmt
+
+    def _is(self, triple, before, after):
+        concept1, stopword, concept2 = triple
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2)
+        if created:
+            print 'Created %s' % assertion
+        self.causation.consider_implications(assertion)
+        return assertion
+
+    def add_concept(self, triple, before, after):
+        concept_name = triple[2]
+        concept, created = Concept.objects.get_or_create(
+            name=concept_name)
+        if created:
+            print 'Created %s' % concept
+        
     def _verb(self, triple, before, after):
         concept1, verb, x = triple
         if isinstance(x, Stopword):
@@ -59,6 +110,7 @@ class Interpreter():
                     verb=verb,
                     concept2=concept2)
         print verb_construct
+        return verb_construct
 
     def is_a(self, triple, before, after):
         concept = triple[0]
@@ -69,8 +121,15 @@ class Interpreter():
             
         concept.category = concept_category
         concept.save()
+
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept,
+            relation=Relation.objects.get(name="IsA"),
+            concept2=concept_category)
+
         self.interpret(before + [concept] + after, last_transform="is_a")
         print '%s is a %s' % (concept, concept_category)
+        return assertion
 
     def of(self, triple, before, after):
         concept = triple[2]
