@@ -4,14 +4,13 @@ class Concept(models.Model):
     name = models.CharField(max_length=1000)
     frequency = models.IntegerField(null=True)
     stats_status = models.CharField(max_length=200, default="needs update", null=False)
-    category = models.ForeignKey('self', null=True, blank=True)
     url = models.CharField(max_length=2000, null=True)
 
     def __unicode__(self):
         return self.name
 
-    def with_category(self):
-        return '%s is a %s' % (self.name, self.category.name)
+    #def with_category(self):
+    #    return '%s is a %s' % (self.name, self.category.name)
 
     pos = None
 
@@ -22,6 +21,13 @@ class Connection(models.Model):
 
     def __unicode__(self):
         return '%s - %s -> %s' % (self.weight, self.conceptA.name, self.conceptB.name)
+
+class Category(models.Model):
+    parent = models.ForeignKey(Concept, related_name="category_set")
+    child = models.ForeignKey(Concept, related_name="instance_set")
+
+    def __unicode__(self):
+        return "%s is a type of  %s" % (self.child, self.parent)
 
 class PersonName(models.Model):
     name = models.CharField(max_length=500)
@@ -77,7 +83,8 @@ class Assertion(models.Model):
 
 class Verb(models.Model):
     name = models.CharField(max_length=500)
-    
+    past_name = models.CharField(max_length=500, null=True, blank=True)
+
     def __unicode__(self):
         return "%s" % (self.name)
 
@@ -101,21 +108,21 @@ class IfStmt(models.Model):
     def __unicode__(self):
         arg1 = self.vc1 or self.assertion1
         arg2 = self.vc2 or self.assertion2
-        return "IF %s THEN %s" % (arg1, arg2)
+        return "IF: %s -> %s" % (arg1, arg2)
 
 # Non-table models
 class Stopword():
     def __init__(self, stopword):
-        self.string = stopword
+        self.name = stopword
 
     def __repr__(self):
-        return 'Stopword: %s' % self.string
+        return 'Stopword: %s' % self.name
 
 class Punctuation():
     def __init__(self, punctuation):
-        self.string = punctuation
+        self.name = punctuation
 
     def __repr__(self):
-        return 'Punctuation: %s' % self.string
+        return 'Punctuation: %s' % self.name
 
     

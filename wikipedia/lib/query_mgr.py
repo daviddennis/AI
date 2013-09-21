@@ -12,13 +12,19 @@ class QueryManager():
         self.lemmatizer = WordNetLemmatizer()
 
     def is_query(self, latest):
+        if len(latest) <= 1:
+            return False
         if isinstance(latest[-1], Punctuation):
             if latest[-1].string == "?":
                 return True
         item = latest[0]
-        if isinstance(item, StopwordSequence) or isinstance(item, Stopword):
+        if isinstance(item, StopwordSequence):
             for w_word in self.w_words:
                 if w_word in item.string:
+                    return True
+        if isinstance(item, Stopword):
+            for w_word in self.w_words:
+                if w_word in item.name:
                     return True
         return False
 
@@ -29,6 +35,7 @@ class QueryManager():
             }
         first_item = latest[0]
         if isinstance(first_item, StopwordSequence) or isinstance(first_item, Stopword):
+
             for w_word in self.w_words:
                 if w_word in first_item.string:
                     query['type'] = w_word

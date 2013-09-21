@@ -1,6 +1,6 @@
 # Django settings for concept_map project.
 
-DEBUG = True
+DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (

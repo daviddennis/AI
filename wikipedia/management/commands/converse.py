@@ -43,6 +43,7 @@ class Command(BaseCommand):
             try:
                 tags = [(word.upper(), pos_tag) for word, pos_tag in en.sentence.tag(text)]
             except:
+                #tags = [('MARY', 'NN'), ('WENT', 'VBD'), ('TO', 'TO'), ('THE', 'DT'), ('ZOO', 'NN')]
                 tags = None
             
             sentence = interpreter.parser.remove_parentheses(text)
@@ -50,22 +51,38 @@ class Command(BaseCommand):
             sentence_list = [sentence]
             parsed_sentence = interpreter.parser.parse(sentence_list, tags=tags)
 
+            interpretations = interpreter.interpret(parsed_sentence)
+
+            print '----'*5
+            for interpretation in interpretations:
+                print interpretation
+                if query_mgr.is_query(interpretation):
+                    print ':Query'
+                    query = query_mgr.construct_query(interpretation)
+                    answer = query_mgr.process_query(query)
+                    answer_sentence = nlp_generator.deparse(answer)
+                    print '\n:: %s\n' % (answer_sentence)
+                else:
+                    print ':Instruction'
+                    interpreter.process_thought(interpretation)
+                #self.process_thought(interpretation)
+
             #self.store_concepts(latest)
 
-            if query_mgr.is_query(parsed_sentence):
-                print ':Query'
-                query = query_mgr.construct_query(parsed_sentence)
-                answer = query_mgr.process_query(query)
-                answer_sentence = nlp_generator.deparse(answer)
-                print '\n:: %s\n' % (answer_sentence)
-            elif causation.is_if_statement(parsed_sentence):
-                print ':Instruction'
-                if_stmt = interpreter.process_if(parsed_sentence, causation=causation)
-                print '\n:: %s\n' % (if_stmt)
-            else:
-                print ':Instruction'
-                thought = interpreter.interpret(parsed_sentence, thinker=self)
-                print thought
+            # if query_mgr.is_query(parsed_sentence):
+            #     print ':Query'
+            #     query = query_mgr.construct_query(parsed_sentence)
+            #     answer = query_mgr.process_query(query)
+            #     answer_sentence = nlp_generator.deparse(answer)
+            #     print '\n:: %s\n' % (answer_sentence)
+            # elif causation.is_if_statement(parsed_sentence):
+            #     print ':Instruction'
+            #     if_stmt = interpreter.process_if(parsed_sentence, causation=causation)
+            #     print '\n:: %s\n' % (if_stmt)
+            # else:
+            #     print ':Instruction'
+            #     thought = interpreter.interpret(parsed_sentence, thinker=self)
+            #     print thought
                 #if thought:
                 #    self.add_thought(thought)
                 

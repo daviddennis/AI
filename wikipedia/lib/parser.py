@@ -1,3 +1,4 @@
+from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import stopwords
 from annoying.functions import get_object_or_None
 from wikipedia.models import Concept, Connection, StopwordSequence, Stopword, Punctuation, Verb
@@ -32,7 +33,7 @@ class Parser():
                         if success:
                             before += [items[0]]
                             remaining = items[1:]
-                        else:                            
+                        else:        
                             items, success = self.parse_concept(item)
                             if success:
                                 before += [items[0]]
@@ -108,16 +109,34 @@ class Parser():
 
     def parse_verb(self, item, tags):
         tokens = self.tokenize(item)
-        if not tags:
-            return ([tokens[0]] + [' '.join(tokens[1:])], False)
-        import en
         verb = None
-        for word, pos_tag in tags:
-            if 'V' in pos_tag:
-                if word == tokens[0]:
-                    verb_or_none = get_object_or_None(Verb, name=en.verb.present(word.lower()))
-                    if verb_or_none:
-                        verb = verb_or_none
+        verb_or_none = get_object_or_None(Verb, past_name=tokens[0])
+        past = False
+        if verb_or_none:
+            verb = verb_or_none
+            past = True
+        else:
+            verb_or_none = get_object_or_None(Verb, name=tokens[0])
+            if verb_or_none:
+                verb = verb_or_none
+            else:
+                if not tags:
+                    return ([tokens[0]] + [' '.join(tokens[1:])], False)
+                #import en
+                for word, pos_tag in tags:
+                    if 'V' in pos_tag:
+                        if word == tokens[0]:
+                            lemmatizer = WordNetLemmatizer()
+                            present_verb_name = lemmatizer.lemmatize(word.lower(), 'v')
+                            verb_or_none = get_object_or_None(Verb, name=present_verb_name)
+                            #en.verb.present(word.lower())
+                            if verb_or_none:
+                                verb = verb_or_none
+        
+        if verb and not past:
+            concept_or_none = get_object_or_None(Concept, name=verb.name)
+            if concept_or_none:
+                verb = None
         if verb:
             return ([verb] + [' '.join(tokens[1:])], True)
         else:
