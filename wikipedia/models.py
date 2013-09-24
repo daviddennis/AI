@@ -1,3 +1,4 @@
+import itertools
 from django.db import models
 
 class Concept(models.Model):
@@ -27,7 +28,7 @@ class Category(models.Model):
     child = models.ForeignKey(Concept, related_name="instance_set")
 
     def __unicode__(self):
-        return "%s is a type of  %s" % (self.child, self.parent)
+        return "%s is a type of %s" % (self.child, self.parent)
 
 class PersonName(models.Model):
     name = models.CharField(max_length=500)
@@ -100,15 +101,36 @@ class VerbConstruct(models.Model):
             return "%s(%s)" % (self.verb.name, (self.concept1 or self.concept2).name)
 
 class IfStmt(models.Model):
-    vc1 = models.ForeignKey(VerbConstruct, related_name="if_1_set", null=True, blank=True)
+    concept1 = models.ForeignKey(Concept, related_name="concept_1_set", null=True, blank=True)
     assertion1 = models.ForeignKey(Assertion, related_name="if_1_ass_set", null=True, blank=True)
-    vc2 = models.ForeignKey(VerbConstruct, related_name="if_2_set", null=True, blank=True)
+    vc1 = models.ForeignKey(VerbConstruct, related_name="if_1_set", null=True, blank=True)
+    concept2 = models.ForeignKey(Concept, related_name="concept_2_set", null=True, blank=True)
     assertion2 = models.ForeignKey(Assertion, related_name="if_2_ass_set", null=True, blank=True)
+    vc2 = models.ForeignKey(VerbConstruct, related_name="if_2_set", null=True, blank=True)
 
     def __unicode__(self):
-        arg1 = self.vc1 or self.assertion1
-        arg2 = self.vc2 or self.assertion2
+        arg1 = self.vc1 or self.assertion1 or self.concept1
+        arg2 = self.vc2 or self.assertion2 or self.concept2
         return "IF: %s -> %s" % (arg1, arg2)
+
+class Adjective(models.Model):
+    name = models.CharField(max_length=500)
+    superlative = models.CharField(max_length=500, blank=True, null=True)
+    form = models.CharField(max_length=50, blank=True, null=True)
+
+    def __unicode__(self):
+        if self.form == 'superlative':
+            return self.superlative
+        else:
+            return self.name
+
+# class SentenceRecord
+
+# class Dialogue(models.Model):
+#     sentence = models.CharField(max_length=2000)
+
+# class History(models.Model):
+#     dialogue
 
 # Non-table models
 class Stopword():
@@ -125,4 +147,25 @@ class Punctuation():
     def __repr__(self):
         return 'Punctuation: %s' % self.name
 
-    
+class Number():
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return 'Number: %s' % self.name
+
+class List():
+
+    def __init__(self, items, _type):
+        self.items = items
+        self.type = _type
+
+    # def __getitem__(self,index):
+    #     try:
+    #         return next(itertools.islice(self.items,index,index+1))
+    #     except TypeError:
+    #         return list(itertools.islice(self.items,index.start,index.stop,index.step))        
+
+    def __repr__(self):
+        return 'List: %s...' % self.items[:3]
+

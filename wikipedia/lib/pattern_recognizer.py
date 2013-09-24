@@ -1,4 +1,4 @@
-from wikipedia.models import Concept, Connection, StopwordSequence, Verb, Assertion, VerbConstruct
+from wikipedia.models import Concept, Connection, StopwordSequence, Verb, Assertion, VerbConstruct, List
 from wikipedia.lib.parser import Stopword
 
 class PatternRecognizer():
@@ -11,14 +11,17 @@ class PatternRecognizer():
         args = pattern.split(' ')
         for i, arg in enumerate(args):
             arg = arg.strip()
+            if i >= len(item_list):
+                if args[i:]:
+                    return False
+                else:
+                    break
             item = item_list[i]
             # if '|' in arg:
             #     if item.__class__.__name__ not in arg.split('|'):
             #         print item.__class__.__name__,arg.split('|')
             #         return False
             arg = arg.upper()
-            #if i >= len(item_list):
-            #    break
             #keep_looking = False
             if arg.startswith("STRING"):
                 if not isinstance(item, str):
@@ -56,6 +59,9 @@ class PatternRecognizer():
                 else:
                     return False
                 continue
+            if arg.startswith("LIST"):
+                if not isinstance(item, List):
+                    return False
             if arg.startswith("ASSERTION"):
                 if not isinstance(item, Assertion):
                     return False

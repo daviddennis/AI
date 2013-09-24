@@ -51,7 +51,7 @@ class Command(BaseCommand):
             sentence_list = [sentence]
             parsed_sentence = interpreter.parser.parse(sentence_list, tags=tags)
 
-            interpretations = interpreter.interpret(parsed_sentence)
+            interpretations = interpreter.interpret(parsed_sentence, thinker=self)
 
             print '----'*5
             for interpretation in interpretations:

@@ -1,7 +1,9 @@
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import stopwords
 from annoying.functions import get_object_or_None
-from wikipedia.models import Concept, Connection, StopwordSequence, Stopword, Punctuation, Verb
+from wikipedia.models import (Concept, Connection, StopwordSequence, 
+                              Stopword, Punctuation, Verb, Number,
+                              Adjective)
 import string
 import sys
 
@@ -33,15 +35,25 @@ class Parser():
                         if success:
                             before += [items[0]]
                             remaining = items[1:]
-                        else:        
-                            items, success = self.parse_concept(item)
+                        else:
+                            items, success = self.parse_number(item)
                             if success:
                                 before += [items[0]]
                                 remaining = items[1:]
                             else:
-                                subitems = self.tokenize(items[0])
-                                before += [subitems[0]]
-                                remaining += [' '.join(subitems[1:])]
+                                items, success = self.parse_adjective(item)
+                                if success:
+                                    before += [items[0]]
+                                    remaining = items[1:]
+                                else:                    
+                                    items, success = self.parse_concept(item)
+                                    if success:
+                                        before += [items[0]]
+                                        remaining = items[1:]
+                                    else:
+                                        subitems = self.tokenize(items[0])
+                                        before += [subitems[0]]
+                                        remaining += [' '.join(subitems[1:])]
             
             if remaining == ['']:
                 break
@@ -104,6 +116,27 @@ class Parser():
         tokens = self.tokenize(item)
         if tokens[0] in string.punctuation:
             return ([Punctuation(tokens[0])] + [' '.join(tokens[1:])], True)
+        else:
+            return ([item], False)
+
+    def parse_number(self, item):
+        tokens = self.tokenize(item)
+        number_set = set([str(x) for x in range(9)])
+        is_number = True
+        for c in tokens[0]:
+            if c not in number_set:
+                is_number = False
+        if is_number:
+            return ([Number(tokens[0])] + [' '.join(tokens[1:])], True)
+        else:
+            return ([item], False)
+            
+
+    def parse_adjective(self, item):
+        tokens = self.tokenize(item)        
+        adjective = get_object_or_None(Adjective, superlative=tokens[0])
+        if adjective:
+            return ([adjective] + [' '.join(tokens[1:])], True)
         else:
             return ([item], False)
 
