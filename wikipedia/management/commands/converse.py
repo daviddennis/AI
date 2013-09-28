@@ -5,6 +5,7 @@ from wikipedia.lib.interpreter import Interpreter
 from wikipedia.lib.query_mgr import QueryManager
 from wikipedia.lib.nlp_gen import NLPGenerator
 from wikipedia.lib.causation import CausationManager
+from wikipedia.lib.thought_processor import ThoughtProcessor
 from sys import stdout
 from time import sleep
 import sys
@@ -20,6 +21,7 @@ class Command(BaseCommand):
         query_mgr = QueryManager()
         nlp_generator =  NLPGenerator()
         causation = CausationManager()
+        thought_processor = ThoughtProcessor()
 
         interpreter.causation = causation
 
@@ -52,6 +54,7 @@ class Command(BaseCommand):
             parsed_sentence = interpreter.parser.parse(sentence_list, tags=tags)
 
             interpretations = interpreter.interpret(parsed_sentence, thinker=self)
+            interpreter.clear_interpretations()
 
             print '----'*5
             for interpretation in interpretations:
@@ -64,7 +67,7 @@ class Command(BaseCommand):
                     print '\n:: %s\n' % (answer_sentence)
                 else:
                     print ':Instruction'
-                    interpreter.process_thought(interpretation)
+                    thought_processor.process_thought(interpretation)
                 #self.process_thought(interpretation)
 
             #self.store_concepts(latest)

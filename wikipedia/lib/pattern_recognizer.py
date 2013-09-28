@@ -1,4 +1,4 @@
-from wikipedia.models import Concept, Connection, StopwordSequence, Verb, Assertion, VerbConstruct, List
+from wikipedia.models import Concept, Connection, StopwordSequence, Verb, Assertion, VerbConstruct, List, Adjective
 from wikipedia.lib.parser import Stopword
 
 class PatternRecognizer():
@@ -53,6 +53,14 @@ class PatternRecognizer():
                 continue
             if arg.startswith("SW"):
                 if isinstance(item, Stopword):
+                    if ':' in arg:
+                        if item.name != arg.split(':')[1]:
+                            return False
+                else:
+                    return False
+                continue
+            if arg.startswith("ADJECTIVE"):
+                if isinstance(item, Adjective):
                     if ':' in arg:
                         if item.name != arg.split(':')[1]:
                             return False

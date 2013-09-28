@@ -136,6 +136,7 @@ class Parser():
         tokens = self.tokenize(item)        
         adjective = get_object_or_None(Adjective, superlative=tokens[0])
         if adjective:
+            adjective.form = 'superlative'
             return ([adjective] + [' '.join(tokens[1:])], True)
         else:
             return ([item], False)

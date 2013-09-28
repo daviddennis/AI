@@ -116,7 +116,9 @@ class IfStmt(models.Model):
 class Adjective(models.Model):
     name = models.CharField(max_length=500)
     superlative = models.CharField(max_length=500, blank=True, null=True)
-    form = models.CharField(max_length=50, blank=True, null=True)
+
+    form = None
+    #form = models.CharField(max_length=50, blank=True, null=True)
 
     def __unicode__(self):
         if self.form == 'superlative':
