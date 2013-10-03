@@ -44,6 +44,8 @@ class Interpreter():
         self.interpret_trigrams(parsed_sentence)
         self.interpret_4grams(parsed_sentence)
         self.interpret_5grams(parsed_sentence)
+        self.interpret_6grams(parsed_sentence)
+        self.interpret_7grams(parsed_sentence)
 
         # Store Topic
         for item in parsed_sentence:
@@ -81,6 +83,8 @@ class Interpreter():
                 self.unigram_exclude_word(unigram, before, after)
             if self.pr.recognize([unigram], "SW:we"):
                 self.unigram_we(unigram, before, after)
+            if self.pr.recognize([unigram], "SWS:was_a"):
+                self.unigram_was_a(unigram, before, after)
             #if self.pr.recognize([unigram], "PUNC:,"):
             #    self.unigram_on_then(unigram, before, after)
             
@@ -94,6 +98,8 @@ class Interpreter():
                 self.bigram_the(bigram, before, after)
             if self.pr.recognize(bigram, "SW:a CONCEPT"):
                 self.bigram_a(bigram, before, after)
+            if self.pr.recognize(bigram, "SW:a VERB"):
+                self.bigram_a_verb(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT SWS:are_an"):
                 self.bigram_are_an(bigram, before, after)
             if self.pr.recognize(bigram, "SW:that CONCEPT"):
@@ -149,6 +155,10 @@ class Interpreter():
                 self._4gram_is_the_of(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT SWS:was_the NUMBER CONCEPT"):
                 self._4gram_was_the_number(_4gram, before, after)
+            if self.pr.recognize(_4gram, "SWS:is_a CONCEPT SW:and CONCEPT"):
+                self._4gram_and(_4gram, before, after)
+            if self.pr.recognize(_4gram, "VERB CONCEPT SW:and CONCEPT"):
+                self._4gram_verb_and(_4gram, before, after)
 
     def interpret_5grams(self, parsed_sentence):
         _5grams = [(v,w,x,y,z) for v,w,x,y,z in zip(parsed_sentence, 
@@ -163,6 +173,36 @@ class Interpreter():
                 self._5gram_small_list_3(_5gram, before, after)
             if self.pr.recognize(_5gram, "CONCEPT VERB CONCEPT VERB CONCEPT"):
                 self._5gram_cvcvc(_5gram, before, after)
+            if self.pr.recognize(_5gram, "CONCEPT VERB CONCEPT SW:and CONCEPT"):
+                self._5gram_and(_5gram, before, after)
+            if self.pr.recognize(_5gram, "CONCEPT SW:are VERB SW:by CONCEPT"):
+                self._5gram_by(_5gram, before, after)
+
+    def interpret_6grams(self, parsed_sentence):
+        pass
+        # _5grams = [(v,w,x,y,z) for v,w,x,y,z in zip(parsed_sentence, 
+        #                                             parsed_sentence[1:],
+        #                                             parsed_sentence[2:],
+        #                                             parsed_sentence[3:],
+        #                                             parsed_sentence[4:])]
+        # for i, _5gram in enumerate(_5grams):
+        #     before = parsed_sentence[:i]
+        #     after = parsed_sentence[i+6:]
+
+    def interpret_7grams(self, parsed_sentence):
+        _7grams = [(t,u,v,w,x,y,z) for t,u,v,w,x,y,z in zip(parsed_sentence, 
+                                                            parsed_sentence[1:],
+                                                            parsed_sentence[2:],
+                                                            parsed_sentence[3:],
+                                                            parsed_sentence[4:],
+                                                            parsed_sentence[5:],
+                                                            parsed_sentence[6:])]
+        for i, _7gram in enumerate(_7grams):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+7:]
+            if self.pr.recognize(_7gram, "CONCEPT SWS:is_what CONCEPT VERB SW:to VERB CONCEPT"):
+                self._7gram_what(_7gram, before, after)
+            
 
     def unigram_sws(self, unigram, before, after):
         sws = unigram
@@ -222,6 +262,10 @@ class Interpreter():
         if self.topic:
             self.add_interpretation(before + [self.topic] + after)
 
+    def unigram_was_a(self, unigram, before, after):
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        self.add_interpretation(before + [is_a] + after)
+
     def unigram_you(self, unigram, before, after):
         category, created = Category.objects.get_or_create(
             parent__name="COMPUTER PROGRAM",
@@ -251,6 +295,12 @@ class Interpreter():
         if concept_as_a:
             self.add_interpretation(before + [concept_as_a] + after)
         self.add_interpretation(before + [concept] + after)
+
+    def bigram_a_verb(self, bigram, before, after):
+        sw, verb = bigram
+        concept_or_none = get_object_or_None(Concept, name=verb.name)
+        if concept_or_none:
+            self.add_interpretation(before + [sw, concept_or_none] + after)
 
     def bigram_are_an(self, bigram, before, after):
         concept, sws = bigram
@@ -369,6 +419,16 @@ class Interpreter():
         is_a = get_object_or_None(StopwordSequence, string="is a".upper())
         self.add_interpretation(before + [concept1, is_a, concept2] + after)
 
+    def _4gram_and(self, _4gram, before, after):
+        sws, c1, _and, c2 = _4gram
+        self.add_interpretation(before + [sws, c1] + after)
+        self.add_interpretation(before + [sws, c2] + after)
+
+    def _4gram_verb_and(self, _4gram, before, after):
+        verb, c2, _and, c3 = _4gram
+        self.add_interpretation(before + [verb, c2] + after)
+        self.add_interpretation(before + [verb, c3] + after)
+
     def _5gram_small_list_3(self, _5gram, before, after):
         concept1, punc, concept2, sw, concept3 = _5gram
         _list = List([concept1, concept2, concept3])
@@ -382,6 +442,19 @@ class Interpreter():
             verb=v2,
             concept2=c3)
         self.add_interpretation(before + [c1, v1, verb_construct] + after)
+
+    def _5gram_and(self, _5gram, before, after):
+        c1, verb, c2, _and, c3 = _5gram
+        self.add_interpretation(before + [c1, verb, c2] + after)
+        self.add_interpretation(before + [c1, verb, c3] + after)
+        
+    def _5gram_by(self, _5gram, before, after):
+        c1, sw1, verb, sw2, c2 = _5gram
+        self.add_interpretation(before + [c2, verb, c1] + after)
+
+    def _7gram_what(self,_7gram, before, after):
+        c1, sws, c2, v1, sw, v2, c3 = _7gram
+        self.add_interpretation(before + [c2, v1, c1, sw, v2, c3] + after)
 
     def ngram_if(self, parsed_sentence):
         statement1 = []

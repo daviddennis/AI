@@ -27,7 +27,7 @@ class PatternRecognizer():
                 if not isinstance(item, str):
                     return False
                 continue
-            if arg in ("VERB","VERB:"):
+            if arg == "VERB" or arg.startswith("VERB:"):
                 if isinstance(item, Verb):
                     if ':' in arg:
                         if item.name != arg.split(':')[1]:

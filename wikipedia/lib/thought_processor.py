@@ -6,28 +6,31 @@ from wikipedia.models import *
 import operator
 import sys
 from annoying.functions import get_object_or_None
+from django.db import transaction
 
 class ThoughtProcessor():
     
     def __init__(self):
         self.pr = PatternRecognizer()
         self.word_mgr = WordManager()
-        self.learned = {
-            'assertions': [],
-            'categories': [],
-            'concepts': [],
-            'verbs': [],
-            'verb constructs': [],
-            'if statements': [],
-            'groups': [],
-            'group instances': []
-            }
+        self.learned = {}
+            # 'assertions': [],
+            # 'categories': [],
+            # 'concepts': [],
+            # 'verbs': [],
+            # 'verb constructs': [],
+            # 'if statements': [],
+            # 'groups': [],
+            # 'group instances': [],
+            # 'aliases': []
+            # }
 
     def process_thought(self, parsed_sentence, thinker=None):
         self.thinker = thinker
         output = []
 
         self.process_unigrams(parsed_sentence)
+        self.process_bigrams(parsed_sentence)
         output = self.process_trigrams(parsed_sentence)
         self.process_4grams(parsed_sentence)
 
@@ -55,6 +58,12 @@ class ThoughtProcessor():
             self.process_c_v_and_v_c(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "CONCEPT:alias CONCEPT SW:as CONCEPT"):
             self.process_alias(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:is_the NUMBER CONCEPT SWS:from_the CONCEPT"):
+            self.process_group_distance(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:is_a CONCEPT SW:in CONCEPT"):
+            self.process_group(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT VERB CONCEPT SW:to VERB CONCEPT"):
+            self.process_to(parsed_sentence)
 
         return output
 
@@ -67,6 +76,14 @@ class ThoughtProcessor():
             if self.pr.recognize([item], "LIST"):
                 self.process_unigram_list(item, before, after)
 
+    def process_bigrams(self, parsed_sentence):
+        bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
+        for i, bigram in enumerate(bigrams):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+2:]
+            if self.pr.recognize(bigram, "NUMBER CONCEPT"):
+                self.process_bigram_amount(bigram, before, after)
+
     def process_trigrams(self, parsed_sentence):
         output = []
 
@@ -77,6 +94,9 @@ class ThoughtProcessor():
             # if self.pr.recognize(item_group, "CONCEPT VERB:cause CONCEPT"):
             #     result = self.process_cause(item_group, before, after)
             #     output += [result]
+            if self.pr.recognize(item_group, "CONCEPT VERB:have CONCEPT"):
+                result = self.process_verb_have(item_group, before, after)
+                output += [result]
             if self.pr.recognize(item_group, "CONCEPT VERB CONCEPT"):
                 result = self.process_verb(item_group, before, after)
                 output += [result]
@@ -91,10 +111,6 @@ class ThoughtProcessor():
                 output += [result]
             if self.pr.recognize(item_group, "CONCEPT SWS:of_the CONCEPT"):
                 self.process_of_the(item_group, before, after)
-                # if stopword.name.upper() == "of".upper():
-                #     self.of(item_group, before, after)
-                # if stopword.name.upper() == "have".upper():
-                #     self.has(item_group, before, after)
             if self.pr.recognize(item_group, 'VERB:switch CONCEPT:context CONCEPT'):
                 self.process_switch_context(parsed_sentence)
             if self.pr.recognize(item_group, "CONCEPT SW:on CONCEPT"):
@@ -161,6 +177,10 @@ class ThoughtProcessor():
             self.process_into(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "NUMBER CONCEPT SWS:of_the CONCEPT"):
             self.process_group_size(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT VERB:have NUMBER CONCEPT"):
+            self.process_group_size_2(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:is_a ADJECTIVE CONCEPT"):
+            self.process_category_adj(parsed_sentence)
             
 
     def process_c_is_a_c_on_the_c_of_c(self, parsed_sentence):
@@ -195,12 +215,67 @@ class ThoughtProcessor():
             verb=verb2,
             concept2=c2)
         self.add_verb_construct(verb_construct)
+    
+    def process_alias(self, parsed_sentence):
+        alias, c1, sw, c2 = parsed_sentence
+        alias, created = Alias.objects.get_or_create(
+            concept1=c1,
+            concept2=c2)
+        self.add_alias(alias)
+        
+    def process_group_distance(self, parsed_sentence):
+        c1, sws, number, c2, sws, c3 = parsed_sentence
+        categories = c1.category_set.filter(parent=c2).all()
+        if categories:
+            groups = Group.objects.filter(
+                child_concept=c2).all()
+            print groups
+            #if groups:
+            #    group_instance, created = GroupInstance.objects.get_or_create(
+            #        group=group,
+            #        )
+
+    def process_group(self, parsed_sentence):
+        c1, sws, c2, sws, c3 = parsed_sentence
+        categories = Category.objects.filter(
+            child=c3).all()
+        for category in categories:
+            groups = Group.objects.filter(
+                parent_concept=category.parent,
+                child_concept=c2).all()
+            for group in groups:
+                group_instance, created = GroupInstance.objects.get_or_create(
+                    group=group,
+                    parent_concept=c3,
+                    child_concept=c1)
+                self.add_group_instance(group_instance)
+
+    def process_to(self, parsed_sentence):
+        c1, verb1, c2, to, verb2, c3 = parsed_sentence[:6]
+        verb_construct1, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=verb1,
+            concept2=c2)
+        verb_construct2, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=verb2,
+            concept2=c3)
+        self.add_verb_construct(verb_construct1)
+        self.add_verb_construct(verb_construct2)
+        self.process_if([Stopword('IF'), verb_construct1, Stopword('THEN'), verb_construct2])
 
     def process_amount(self, amount, before, after):
         self.remember(amount)
 
     def process_unigram_list(self, _list, before, after):
         self.remember(_list)
+
+    def process_bigram_amount(self, bigram, before, after):
+        number, concept = bigram
+        amount, created = Amount.objects.get_or_create(
+            number=number.number,
+            concept=concept)
+        self.add_amount(amount)
 
     def process_if(self, parsed_sentence):
         _if, item1, then, item2 = tuple(parsed_sentence)
@@ -331,7 +406,22 @@ class ThoughtProcessor():
             child_concept=c1,
             size=number.number)
         self.add_group(group)
-        self.reinterpret()
+        #self.reinterpret()
+
+    def process_group_size_2(self, parsed_sentence):
+        c1, verb, number, c2 = parsed_sentence
+        group, created = Group.objects.get_or_create(
+            parent_concept=c1,
+            child_concept=c2,
+            size=number.number)
+        self.add_group(group)
+
+    def process_category_adj(self, parsed_sentence):
+        c1, sws, adj, c2 = parsed_sentence
+        category, created = Category.objects.get_or_create(
+            parent=c2,
+            child=c1)
+        self.add_category(category)
 
     def process_rank(self, parsed_sentence):
         c1, sws, number, c2, sw_s, c3 = parsed_sentence
@@ -496,13 +586,11 @@ class ThoughtProcessor():
             concept1=concept1,
             relation=relation,
             concept2=concept2)
-        if created:
-           print 'Created %s' % assertion
+        self.add_assertion(assertion)
         new_category, created = Category.objects.get_or_create(
             parent=concept2,
             child=concept1)
-        if created:
-            print 'Created %s' % new_category
+        self.add_category(new_category)
         return assertion, new_category
 
     def process_is_not_a(self, triple, before, after):
@@ -555,6 +643,15 @@ class ThoughtProcessor():
             context=self.get_context())
         self.add_verb_construct(verb_construct)
         return verb_construct
+
+    def process_verb_have(self, triple, before, after):
+        c1, verb, c2 = triple
+        c1 = self.word_mgr.get_singular_concept(c1)
+        c2 = self.word_mgr.get_singular_concept(c2)
+        group, created = Group.objects.get_or_create(
+            parent_concept=c1,
+            child_concept=c2)
+        self.add_group(group)
 
     def process_verb_amount(self, triple, before, after):
         concept1, verb, amount2 = triple
@@ -618,6 +715,18 @@ class ThoughtProcessor():
         self.learned[key_name] = self.learned.get(key_name, [])
         if group_instance not in self.learned.get(key_name, []):
             self.learned[key_name] += [group_instance]
+
+    def add_alias(self, alias):
+        key_name = 'aliases'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if alias not in self.learned.get(key_name, []):
+            self.learned[key_name] += [alias]
+
+    def add_amount(self, amount):
+        key_name = 'amounts'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if amount not in self.learned.get(key_name, []):
+            self.learned[key_name] += [amount]
 
     def remember(self, item):
         if self.thinker:

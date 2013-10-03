@@ -35,7 +35,7 @@ class Command(BaseCommand):
 
         print '\nHello\n'
         text = ''
-        
+
         while True:
             print '> ',
             text = raw_input().upper()
@@ -65,7 +65,7 @@ class Command(BaseCommand):
             num_interpretations = len(interpretations)
             print '# interpretations: %s' % num_interpretations
             
-            if num_interpretations < 30:
+            if num_interpretations < 100:
                 print interpretations
 
             print '----'*5
@@ -82,7 +82,8 @@ class Command(BaseCommand):
                     thought_processor.process_thought(interpretation, thinker=self)
                 #self.process_thought(interpretation)
 
-            print thought_processor.learned
+            for key, val in thought_processor.learned.iteritems():
+                print key,':',val
             thought_processor.learned = {}
 
             #self.store_concepts(latest)

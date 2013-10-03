@@ -32,7 +32,7 @@ class Alias(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="alias_1_set")
     concept2 = models.ForeignKey(Concept, related_name="alias_2_set")
 
-    def __unicode(self):
+    def __unicode__(self):
         return '%s = %s' % (self.concept1, self.concept2)
 
 class Context(models.Model):
@@ -80,7 +80,7 @@ class Group(models.Model):
         return val
 
 class GroupInstance(models.Model):
-    group = models.ForeignKey(Group)
+    group = models.ForeignKey(Group, related_name="instance_set")
     parent_concept = models.ForeignKey(Concept, related_name="parent_set")
     child_concept = models.ForeignKey(Concept, related_name="child_set")
     rank = models.IntegerField(null=True, blank=True)

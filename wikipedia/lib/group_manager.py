@@ -7,9 +7,9 @@ lmtzr = WordNetLemmatizer()
 class GroupManager():
     
     def __init__(self):
-        Group.objects.all().delete()
-        GroupInstance.objects.all().delete()
-        #pass
+        #Group.objects.all().delete()
+        #GroupInstance.objects.all().delete()
+        pass
 
     def check_and_form_group(self, parent_concept, child_concept):
         original_parent_concept = parent_concept
