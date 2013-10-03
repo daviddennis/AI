@@ -2,9 +2,9 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from wikipedia.lib.parser import Parser, Stopword
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.group_manager import GroupManager
-from wikipedia.models import (Concept, Connection, StopwordSequence, Group, 
-                              GroupInstance, Verb, VerbConstruct, Assertion,
-                              Relation, IfStmt, Category, List)
+from wikipedia.lib.word_mgr import WordManager
+from wikipedia.lib.time_mgr import TimeManager
+from wikipedia.models import *
 import operator
 import sys
 from annoying.functions import get_object_or_None
@@ -18,12 +18,19 @@ class Interpreter():
         self.pr = PatternRecognizer()
         self.group_mgr = GroupManager()
         self.interpretations = []
+        self.topic = None
+        self.word_mgr = WordManager()
+        self.thought_processor = None
+        self.time_mgr = TimeManager()
+
+        self.one_item = None
 
     def interpret(self, parsed_sentence, last_transform=None, thinker=None):
         if thinker:
             self.thinker = thinker
-        print parsed_sentence
+        #print parsed_sentence
         self.add_interpretation(parsed_sentence)
+
 
         if self.pr.recognize(parsed_sentence, "SW:if ... ... ... SW:then ... ... ..."):
             self.ngram_if(parsed_sentence)
@@ -36,37 +43,47 @@ class Interpreter():
         self.interpret_bigrams(parsed_sentence)
         self.interpret_trigrams(parsed_sentence)
         self.interpret_4grams(parsed_sentence)
-        # item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
-        # for i, item_group in enumerate(item_groups):
-        #     before = parsed_sentence[:i]
-        #     after = parsed_sentence[i+3:]
-        #     print item_group
-        #     if self.pr.recognize(item_group, "SW:the CONCEPT"):
-        #         self.the(item_group, before, after)
-            #if self.pr.recognize(item_group, 'PUNC:" CONCEPT PUNC:"'):
-            #    self.quotes(item_group, before, after, thinker)
-            # if self.pr.recognize(item_group, "CONCEPT VERB"):
-            #     self._verb(item_group, before, after)
-            # if self.pr.recognize(item_group, "CONCEPT SWS CONCEPT"):
-            #     stopword_sequence = item_group[1]
-            #     if stopword_sequence.string.upper() == "is the".upper():
-            #         self.is_the(item_group, before, after)
-            #     if stopword_sequence.string.upper() == "is a".upper():
-            #         self.is_a(item_group, before, after)
-            #     if stopword_sequence.string.upper() in group_stopword_seqs:
-            #         self.on_the(item_group, before, after)
+        self.interpret_5grams(parsed_sentence)
+
+        # Store Topic
+        for item in parsed_sentence:
+            if isinstance(item, Concept):
+                self.topic = item
+                break
+
         return self.interpretations #self.return_interpretations()
 
     def interpret_unigrams(self, parsed_sentence):
         for i, unigram in enumerate(parsed_sentence):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+1:]
+            if self.pr.recognize([unigram], "SW:you"):
+                self.unigram_you(unigram, before, after)
             if self.pr.recognize([unigram], "SWS"):
                 self.unigram_sws(unigram, before, after)
             if self.pr.recognize([unigram], "SW:are"):
                 self.unigram_are(unigram, before, after)
             if self.pr.recognize([unigram], "SWS:on_then"):
                 self.unigram_on_then(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:it"):
+                self.unigram_it(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:so"):
+                self.unigram_so(unigram, before, after)
+            if self.pr.recognize([unigram], "SWS:was_an"):
+                self.unigram_was_an(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:i"):
+                self.unigram_i(unigram, before, after)
+            if self.pr.recognize([unigram], "CONCEPT"):
+                self.unigram_concept(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:can"):
+                self.unigram_exclude_word(unigram, before, after)
+            if self.pr.recognize([unigram], "CONCEPT:the_way"):
+                self.unigram_exclude_word(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:we"):
+                self.unigram_we(unigram, before, after)
+            #if self.pr.recognize([unigram], "PUNC:,"):
+            #    self.unigram_on_then(unigram, before, after)
+            
 
     def interpret_bigrams(self, parsed_sentence):
         bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
@@ -81,6 +98,12 @@ class Interpreter():
                 self.bigram_are_an(bigram, before, after)
             if self.pr.recognize(bigram, "SW:that CONCEPT"):
                 self.bigram_recall(bigram, before, after)
+            if self.pr.recognize(bigram, "NUMBER CONCEPT"):
+                self.bigram_amount(bigram, before, after)
+            if self.pr.recognize(bigram, "SW SW"):
+                self.bigram_sw(bigram, before, after)
+            if self.pr.recognize(bigram, "SW:the CONCEPT:way"):
+                self.bigram_exclude(bigram, before, after)
 
     def interpret_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
@@ -91,6 +114,20 @@ class Interpreter():
                 self.trigram_to_the(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_an CONCEPT"):
                 self.trigram_is_an(trigram, before, after)
+            if self.pr.recognize(trigram, "... PUNC:, ..."):
+                self.trigram_comma(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:are LIST"):
+                self.trigram_are_list(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:are CONCEPT"):
+                self.trigram_are(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SWS:such_as CONCEPT"):
+                self.trigram_such_as(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SWS:am_a CONCEPT"):
+                self.trigram_am_a(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SWS:will_be CONCEPT"):
+                self.trigram_will_be(trigram, before, after)                
+            if self.pr.recognize(trigram, "SWS:was_a TIME CONCEPT"):
+                self.trigram_time(trigram, before, after)                
 
     def interpret_4grams(self, parsed_sentence):
         _4grams = [(w,x,y,z) for w,x,y,z in zip(parsed_sentence, 
@@ -104,6 +141,28 @@ class Interpreter():
                 self._4gram_is_the(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT:file CONCEPT PUNC:. CONCEPT:CSV"):
                 self._4gram_file(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SWS:is_a ADJECTIVE CONCEPT"):
+                self._4gram_adj(_4gram, before, after)
+            if self.pr.recognize(_4gram, "NUMBER CONCEPT SW:of CONCEPT"):
+                self._4gram_amount(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SWS:is_the CONCEPT SW:of"):
+                self._4gram_is_the_of(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SWS:was_the NUMBER CONCEPT"):
+                self._4gram_was_the_number(_4gram, before, after)
+
+    def interpret_5grams(self, parsed_sentence):
+        _5grams = [(v,w,x,y,z) for v,w,x,y,z in zip(parsed_sentence, 
+                                                    parsed_sentence[1:],
+                                                    parsed_sentence[2:],
+                                                    parsed_sentence[3:],
+                                                    parsed_sentence[4:])]
+        for i, _5gram in enumerate(_5grams):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+5:]
+            if self.pr.recognize(_5gram, "CONCEPT PUNC:, CONCEPT SW:and CONCEPT"):
+                self._5gram_small_list_3(_5gram, before, after)
+            if self.pr.recognize(_5gram, "CONCEPT VERB CONCEPT VERB CONCEPT"):
+                self._5gram_cvcvc(_5gram, before, after)
 
     def unigram_sws(self, unigram, before, after):
         sws = unigram
@@ -119,8 +178,64 @@ class Interpreter():
             self.add_interpretation(before + [concept_or_none, Stopword('THEN')] + after)
 
     def unigram_are(self, unigram, before, after):
-        sw = unigram
-        self.interpret(before + [Stopword('IS')] + after)
+        pass
+        #sw = unigram
+        #self.interpret(before + [Stopword('IS')] + after)
+
+    def unigram_it(self, unigram, before, after):
+        if self.topic:
+            #print before + [self.topic] + after
+            self.interpret(before + [self.topic] + after)
+
+    def unigram_so(self, unigram, before, after):
+        self.interpret(before + after)
+
+    def unigram_was_an(self, unigram, before, after):
+        was_a = get_object_or_None(StopwordSequence, string="was a".upper())
+        self.add_interpretation(before + [was_a] + after)
+
+    def unigram_i(self, unigram, before, after):
+        david_dennis = get_object_or_None(Concept, name="DAVID DENNIS")
+        self.add_interpretation(before + [david_dennis] + after)
+
+    def unigram_concept(self, unigram, before, after):
+        concept = unigram
+        if 'OF' in concept.name:
+            concept_name1, concept_name2 = concept.name.split(' OF ')
+            if concept_name1 not in ('THE') and concept_name2 not in ('THE'):
+                concept1 = get_object_or_None(Concept, name=concept_name1)
+                concept2 = get_object_or_None(Concept, name=concept_name2)
+                if concept1 and concept2:
+                    self.add_interpretation(before + [concept1, Stopword('OF'), concept2] + after)
+        if concept.name.startswith('THE '):
+            new_concept_name = concept.name.replace('THE ','',1)
+            new_concept = get_object_or_None(Concept, name=new_concept_name)
+            if new_concept:
+                self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
+        if self.time_mgr.recognize_time(concept.name):
+            self.add_interpretation(before + [Time(concept.name)] + after)
+
+    def unigram_exclude_word(self, unigram, before, after):
+        self.add_interpretation(before + after)
+
+    def unigram_we(self, unigram, before, after):
+        if self.topic:
+            self.add_interpretation(before + [self.topic] + after)
+
+    def unigram_you(self, unigram, before, after):
+        category, created = Category.objects.get_or_create(
+            parent__name="COMPUTER PROGRAM",
+            child__name="AI")
+        self.add_interpretation(before + [category] + after)
+
+    def bigram_sw(self, bigram, before, after):
+        sw1, sw2 = bigram
+        sws = get_object_or_None(StopwordSequence, string=' '.join([sw1.name, sw2.name]))
+        if sws:
+            self.add_interpretation(before + [sws] + after, recurse=False)
+
+    def bigram_exclude(self, bigram, before, after):
+        self.add_interpretation(before + after)
 
     def bigram_the(self, bigram, before, after):
         sw, concept = bigram
@@ -135,6 +250,7 @@ class Interpreter():
         concept_as_a = get_object_or_None(Concept, name='a '.upper() + concept.name)
         if concept_as_a:
             self.add_interpretation(before + [concept_as_a] + after)
+        self.add_interpretation(before + [concept] + after)
 
     def bigram_are_an(self, bigram, before, after):
         concept, sws = bigram
@@ -152,6 +268,19 @@ class Interpreter():
         if item:
             self.add_interpretation(before + [item] + after)
 
+    def bigram_amount(self, bigram, before, after):
+        number, concept = tuple(bigram)
+        if number.number.is_integer() and number.number < 1000:
+            concept = self.word_mgr.get_singular_concept(concept)
+            _list = List([concept for i in xrange(int(number.number))])
+            self.add_interpretation(before + [_list] + after)
+        else:
+            amount, created = Amount.objects.get_or_create(
+                number=number.number,
+                concept=concept)
+            self.add_interpretation(before + [amount] + after)
+
+
     def trigram_to_the(self, trigram, before, after):
         verb, sws, concept = trigram
         trigram = list(trigram)
@@ -163,6 +292,46 @@ class Interpreter():
         new_sws = get_object_or_None(StopwordSequence, string="is a".upper())
         self.add_interpretation(before + [concept1, new_sws, concept2] + after)
 
+    def trigram_comma(self, trigram, before, after):
+        item1, punc, item2 = trigram
+        self.add_interpretation(before + [item1])
+        self.add_interpretation([item2] + after)
+
+    def trigram_are_list(self, trigram, before, after):
+        concept, sw, _list = trigram
+        self.add_interpretation(before + [_list, sw, concept] + after)
+
+    def trigram_are(self, trigram, before, after):
+        concept1, sw, concept2 = trigram
+        sw_is = Stopword('IS')
+        concept1 = self.word_mgr.get_singular_concept(concept1)
+        self.add_interpretation(before + [concept1, sw_is, concept2] + after)
+
+    def trigram_such_as(self, trigram, before, after):
+        concept1, sws, concept2 = trigram
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        concept1 = self.word_mgr.get_singular_concept(concept1)
+        self.add_interpretation(before + [concept2, is_a, concept1] + after)
+
+    def trigram_such_as(self, trigram, before, after):
+        concept1, am_a, concept2 = trigram
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        self.add_interpretation(before + [concept1, is_a, concept2] + after)
+
+    def trigram_will_be(self, trigram, before, after):
+        concept1, will_be, concept2 = trigram
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2)
+        self.add_interpretation(before + [assertion] + after)
+
+    def trigram_time(self, trigram, before, after):
+        sws, time, concept = trigram
+        concept.time_keyword = time.name
+        self.add_interpretation(before + [sws, concept] + after)
+
     def _4gram_file(self, _4gram, before, after):
         file_concept, file_name_concept, punc, csv = tuple(_4gram)
         new_concept, created = Concept.objects.get_or_create(
@@ -172,11 +341,47 @@ class Interpreter():
             child=new_concept)
         self.add_interpretation(before + [new_concept] + after)
 
+    def _4gram_adj(self, _4gram, before, after):
+        concept1, sws, adj, concept2 = tuple(_4gram)
+        self.add_interpretation(before + [concept1, sws, concept2] + after)
+
+    def _4gram_amount(self, _4gram, before, after):
+        number, unit_concept, sw, concept = tuple(_4gram)
+        amount, created = Amount.objects.get_or_create(
+            number=number.number,
+            unit=unit_concept,
+            concept=concept)
+        self.add_interpretation(before + [amount] + after)
+
     def _4gram_is_the(self, _4gram, before, after):
         concept1, sws, concept2, concept3 = _4gram
         _4gram = list(_4gram)
         sws = get_object_or_None(StopwordSequence, string="is a".upper())
         self.add_interpretation(before + [concept1, sws, concept3] + after)
+
+    def _4gram_is_the_of(self, _4gram, before, after):
+        concept1, sws, concept2, sw = _4gram
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        self.add_interpretation([concept1, is_a, concept2])
+
+    def _4gram_was_the_number(self, _4gram, before, after):
+        concept1, sws, number, concept2 = _4gram
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        self.add_interpretation(before + [concept1, is_a, concept2] + after)
+
+    def _5gram_small_list_3(self, _5gram, before, after):
+        concept1, punc, concept2, sw, concept3 = _5gram
+        _list = List([concept1, concept2, concept3])
+        self.add_interpretation(before + [_list] + after)
+        self.print_once(before + [_list] + after)
+
+    def _5gram_cvcvc(self, _5gram, before, after):
+        c1, v1, c2, v2, c3 = _5gram
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c2,
+            verb=v2,
+            concept2=c3)
+        self.add_interpretation(before + [c1, v1, verb_construct] + after)
 
     def ngram_if(self, parsed_sentence):
         statement1 = []
@@ -194,10 +399,10 @@ class Interpreter():
             statement2 += [item]
 
         item1 = item2 = None
-        item1_results = self.process_thought(statement1)
+        item1_results = self.thought_processor.process_thought(statement1)
         if item1_results:
             item1 = item1_results[0]
-        item2_results = self.process_thought(statement2)
+        item2_results = self.thought_processor.process_thought(statement2)
         if item2_results:
             item2 = item2_results[0]
         if item1 and item2:
@@ -223,7 +428,7 @@ class Interpreter():
             concept2=concept).all()
         things = [a.concept1 for a in assertions]
         list_of_everything = List(things, concept)
-        self.add_interpretation([list_of_everything] + parsed_sentence[3:])
+        self.add_interpretation([list_of_everything] + parsed_sentence[3:])        
 
     #def the(
         #concept_wo_the = get_object_or_None(Concept, name=' '.join(first_concept.name.split(' ')[1:]))
@@ -316,10 +521,16 @@ class Interpreter():
                     i += 1
 
 
-    def add_interpretation(self, interpretation):
+    def add_interpretation(self, interpretation, recurse=True):
         if interpretation not in self.interpretations:
             self.interpretations += [interpretation]
-            self.interpret(interpretation)
+            # for x in self.interpretations:
+            #     print x
+            # print '\n'
+            # import time
+            # time.sleep(4)
+            if recurse:
+                self.interpret(interpretation)
 
     def remember(self, key, val):
         self.thinker.computer_mind[key] = val
@@ -334,3 +545,28 @@ class Interpreter():
 
     def clear_interpretations(self):
         self.interpretations = []
+
+    def print_once(self, string):
+        self.one_item = string
+        
+
+
+        # item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
+        # for i, item_group in enumerate(item_groups):
+        #     before = parsed_sentence[:i]
+        #     after = parsed_sentence[i+3:]
+        #     print item_group
+        #     if self.pr.recognize(item_group, "SW:the CONCEPT"):
+        #         self.the(item_group, before, after)
+            #if self.pr.recognize(item_group, 'PUNC:" CONCEPT PUNC:"'):
+            #    self.quotes(item_group, before, after, thinker)
+            # if self.pr.recognize(item_group, "CONCEPT VERB"):
+            #     self._verb(item_group, before, after)
+            # if self.pr.recognize(item_group, "CONCEPT SWS CONCEPT"):
+            #     stopword_sequence = item_group[1]
+            #     if stopword_sequence.string.upper() == "is the".upper():
+            #         self.is_the(item_group, before, after)
+            #     if stopword_sequence.string.upper() == "is a".upper():
+            #         self.is_a(item_group, before, after)
+            #     if stopword_sequence.string.upper() in group_stopword_seqs:
+            #         self.on_the(item_group, before, after)

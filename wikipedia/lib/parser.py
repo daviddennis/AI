@@ -7,12 +7,24 @@ from wikipedia.models import (Concept, Connection, StopwordSequence,
 import string
 import sys
 
-stop_words = set([x.upper() for x in stopwords.words('english')])
+stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')])
+
 
 class Parser():
 
     def __init__(self):
-        pass
+        self.text_numbers = {
+            'ONE': 1,
+            'TWO': 2,
+            'THREE': 3,
+            'FOUR': 4,
+            'FIVE': 5,
+            'SIX': 6,
+            'SEVEN': 7,
+            'EIGHT': 8,
+            'NINE': 9,
+            'TEN': 10,
+            }
 
     def parse(self, latest, tags=None):
         before = []
@@ -121,13 +133,17 @@ class Parser():
 
     def parse_number(self, item):
         tokens = self.tokenize(item)
+        number_token = tokens[0]
+        if number_token in self.text_numbers:
+            return ([Number(self.text_numbers[number_token])] + [' '.join(tokens[1:])], True)
+        number_token = number_token.replace('ST','').replace('ND','').replace('RD','')
         number_set = set([str(x) for x in range(9)])
         is_number = True
-        for c in tokens[0]:
+        for c in number_token:
             if c not in number_set:
                 is_number = False
         if is_number:
-            return ([Number(tokens[0])] + [' '.join(tokens[1:])], True)
+            return ([Number(number_token)] + [' '.join(tokens[1:])], True)
         else:
             return ([item], False)
             
@@ -146,28 +162,34 @@ class Parser():
         verb = None
         verb_or_none = get_object_or_None(Verb, past_name=tokens[0])
         past = False
+        participle = False
         if verb_or_none:
             verb = verb_or_none
             past = True
         else:
-            verb_or_none = get_object_or_None(Verb, name=tokens[0])
+            verb_or_none = get_object_or_None(Verb, participle_name=tokens[0])
             if verb_or_none:
                 verb = verb_or_none
+                participle = True
             else:
-                if not tags:
-                    return ([tokens[0]] + [' '.join(tokens[1:])], False)
-                #import en
-                for word, pos_tag in tags:
-                    if 'V' in pos_tag:
-                        if word == tokens[0]:
-                            lemmatizer = WordNetLemmatizer()
-                            present_verb_name = lemmatizer.lemmatize(word.lower(), 'v')
-                            verb_or_none = get_object_or_None(Verb, name=present_verb_name)
-                            #en.verb.present(word.lower())
-                            if verb_or_none:
-                                verb = verb_or_none
+                verb_or_none = get_object_or_None(Verb, name=tokens[0])
+                if verb_or_none:
+                    verb = verb_or_none
+                else:
+                    if not tags:
+                        return ([tokens[0]] + [' '.join(tokens[1:])], False)
+                    #import en
+                    for word, pos_tag in tags:
+                        if 'V' in pos_tag:
+                            if word == tokens[0]:
+                                lemmatizer = WordNetLemmatizer()
+                                present_verb_name = lemmatizer.lemmatize(word.lower(), 'v')
+                                verb_or_none = get_object_or_None(Verb, name=present_verb_name)
+                                #en.verb.present(word.lower())
+                                if verb_or_none:
+                                    verb = verb_or_none
         
-        if verb and not past:
+        if verb and not past and not participle:
             concept_or_none = get_object_or_None(Concept, name=verb.name)
             if concept_or_none:
                 verb = None

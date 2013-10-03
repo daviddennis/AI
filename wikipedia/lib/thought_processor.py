@@ -1,0 +1,632 @@
+from nltk.stem.wordnet import WordNetLemmatizer
+from wikipedia.lib.parser import Parser, Stopword
+from wikipedia.lib.pattern_recognizer import PatternRecognizer
+from wikipedia.lib.word_mgr import WordManager
+from wikipedia.models import *
+import operator
+import sys
+from annoying.functions import get_object_or_None
+
+class ThoughtProcessor():
+    
+    def __init__(self):
+        self.pr = PatternRecognizer()
+        self.word_mgr = WordManager()
+        self.learned = {
+            'assertions': [],
+            'categories': [],
+            'concepts': [],
+            'verbs': [],
+            'verb constructs': [],
+            'if statements': [],
+            'groups': [],
+            'group instances': []
+            }
+
+    def process_thought(self, parsed_sentence, thinker=None):
+        self.thinker = thinker
+        output = []
+
+        self.process_unigrams(parsed_sentence)
+        output = self.process_trigrams(parsed_sentence)
+        self.process_4grams(parsed_sentence)
+
+        if self.pr.recognize(parsed_sentence, "CONCEPT SW:is VERB:use SW:to CONCEPT"):
+            self.process_used_to(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT VERB:contain SW:a CONCEPT:list SW:of CONCEPT"):
+            self.process_file(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:is_the ADJ CONCEPT SWS:in_the CONCEPT"):
+            self.process_range(parsed_sentence)            
+        if self.pr.recognize(parsed_sentence, "CONCEPT SW:is VERB SW:as CONCEPT"):
+            self.process_is_verb_as(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, 'VERB:add CONCEPT:concept PUNC:" ... ...'):
+            self.process_add_quoted_concept(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, 'VERB:add CONCEPT:concept PUNC:" ... ... ...'):
+            self.process_add_quoted_concept(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT VERB CONCEPT ADJECTIVE CONCEPT"):
+            self.process_cvca(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:was_the NUMBER CONCEPT SW:of CONCEPT"):
+            self.process_rank(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:was_the NUMBER CONCEPT SWS:of_the CONCEPT"):
+            self.process_rank(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SWS:is_a CONCEPT SWS:on_the CONCEPT SW:of CONCEPT"):
+            self.process_c_is_a_c_on_the_c_of_c(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT VERB SW:and VERB CONCEPT"):
+            self.process_c_v_and_v_c(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT:alias CONCEPT SW:as CONCEPT"):
+            self.process_alias(parsed_sentence)
+
+        return output
+
+    def process_unigrams(self, parsed_sentence):
+        for i, item in enumerate(parsed_sentence):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+1:]
+            if self.pr.recognize([item], "AMOUNT"):
+                self.process_amount(item, before, after)
+            if self.pr.recognize([item], "LIST"):
+                self.process_unigram_list(item, before, after)
+
+    def process_trigrams(self, parsed_sentence):
+        output = []
+
+        item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
+        for i, item_group in enumerate(item_groups):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+3:]
+            # if self.pr.recognize(item_group, "CONCEPT VERB:cause CONCEPT"):
+            #     result = self.process_cause(item_group, before, after)
+            #     output += [result]
+            if self.pr.recognize(item_group, "CONCEPT VERB CONCEPT"):
+                result = self.process_verb(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT VERB AMOUNT"):
+                result = self.process_verb_amount(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SW:is CONCEPT"):
+                result = self.process_is(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SW:has CONCEPT"):
+                result = self.process_has(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SWS:of_the CONCEPT"):
+                self.process_of_the(item_group, before, after)
+                # if stopword.name.upper() == "of".upper():
+                #     self.of(item_group, before, after)
+                # if stopword.name.upper() == "have".upper():
+                #     self.has(item_group, before, after)
+            if self.pr.recognize(item_group, 'VERB:switch CONCEPT:context CONCEPT'):
+                self.process_switch_context(parsed_sentence)
+            if self.pr.recognize(item_group, "CONCEPT SW:on CONCEPT"):
+                result = self.process_on(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SWS:is_a CONCEPT"):
+                result = self.process_is_a(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SWS:is_not_a CONCEPT"):
+                result = self.process_is_not_a(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SWS:is_not CONCEPT"):
+                result = self.process_is_not(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "VERB:add CONCEPT:concept STRING"):
+                result = self.process_add_concept(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "VERB:list SW:all CONCEPT"):
+                result = self.process_list_concepts(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "VERB:ask SW:a CONCEPT:question"):
+                result = self.process_ask_question(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "LIST SWS:is_in_a CONCEPT"):
+                result = self.process_list_in(item_group, before, after)
+                output += [result]     
+            if self.pr.recognize(item_group, "LIST SW:are CONCEPT"):
+                result = self.process_list_are(item_group, before, after)
+                output += [result]     
+            if self.pr.recognize(item_group, "VERB:show SWS:what_you CONCEPT:know"):
+                result = self.process_show_mind(item_group, before, after)
+                output += [result]     
+            if self.pr.recognize(item_group, "VERB:remove CONCEPT:concept CONCEPT"):
+                result = self.process_remove_concept(item_group, before, after)
+                output += [result]
+            if self.pr.recognize(item_group, "VERB:take CONCEPT CONCEPT:away"):
+                result = self.process_subtract_concept(item_group, before, after)
+                output += [result]                
+            if self.pr.recognize(item_group, "CONCEPT VERB VERBCONSTRUCT"):
+                result = self.process_c_v_vc(item_group, before, after)
+                output += [result]     
+
+        return output
+
+    def process_4grams(self, parsed_sentence):
+        # item_groups = [(w,x,y,z) for w,x,y,z in zip(parsed_sentence, 
+        #                                             parsed_sentence[1:], 
+        #                                             parsed_sentence[2:],
+        #                                             parsed_sentence[3:])]
+        # for i, item_group in enumerate(item_groups):
+        #     before = parsed_sentence[:i]
+        #     after = parsed_sentence[i+4:]
+        if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
+            self.process_if(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "SW:if VERBCONSTRUCT SW:then ASSERTION"):
+            self.process_if(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then ASSERTION"):
+            self.process_if(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "SW:if VERBCONSTRUCT SW:then VERBCONSTRUCT"):
+            self.process_if(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT PUNC:' SW:s CONCEPT"):
+            self.process_apostrophe(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "VERB CONCEPT SW:into CONCEPT"):
+            self.process_into(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "NUMBER CONCEPT SWS:of_the CONCEPT"):
+            self.process_group_size(parsed_sentence)
+            
+
+    def process_c_is_a_c_on_the_c_of_c(self, parsed_sentence):
+        c1, sws1, c2, sws2, c3, sw, c4 = parsed_sentence
+        category, created = Category.objects.get_or_create(
+            parent=c2,
+            child=c1)
+        self.add_category(category)
+        category, created = Category.objects.get_or_create(
+            parent=c3,
+            child=c4)
+        self.add_category(category)
+        group, created = Group.objects.get_or_create(
+            parent_concept=c3,
+            child_concept=c2)
+        self.add_group(group)
+        group_instance, created = GroupInstance.objects.get_or_create(
+            group=group,
+            parent_concept=c4,
+            child_concept=c1)
+        self.add_group_instance(group_instance)
+
+    def process_c_v_and_v_c(self, parsed_sentence):
+        c1, verb1, sw, verb2, c2 = parsed_sentence
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=verb1,
+            concept2=c2)
+        self.add_verb_construct(verb_construct)
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=verb2,
+            concept2=c2)
+        self.add_verb_construct(verb_construct)
+
+    def process_amount(self, amount, before, after):
+        self.remember(amount)
+
+    def process_unigram_list(self, _list, before, after):
+        self.remember(_list)
+
+    def process_if(self, parsed_sentence):
+        _if, item1, then, item2 = tuple(parsed_sentence)
+        vc1 = assertion1 = vc2 = assertion2 = None
+        if isinstance(item1, Assertion):
+            assertion1 = item1
+        if isinstance(item1, VerbConstruct):
+            vc1 = item1
+        if isinstance(item2, Assertion):
+            assertion2 = item2
+        if isinstance(item2, VerbConstruct):
+            vc2 = item2
+        if_stmt, created = IfStmt.objects.get_or_create(
+            vc1=vc1,
+            assertion1=assertion1,
+            vc2=vc2,
+            assertion2=assertion2)
+        self.add_if_stmt(if_stmt)
+
+    def process_used_to(self, parsed_sentence):
+        concept1, sw, verb, sw, concept2 = tuple(parsed_sentence)
+        if verb.name == "USE":
+            relation = get_object_or_None(Relation, name="UsedFor")
+            assertion, created = Assertion.objects.get_or_create(
+                concept1=concept1,
+                relation=relation,
+                concept2=concept2)
+            print assertion
+
+    def process_file(self, parsed_sentence):
+        file_name_concept, verb, sw, list_concept, sw, category_concept = tuple(parsed_sentence)
+        items = []
+        try:
+            input_file = open(file_name_concept.name, 'r')
+        except:
+            input_file = open(file_name_concept.name.lower(), 'r')
+        for line in input_file:
+            new_concept, created = Concept.objects.get_or_create(
+                name=line.strip().upper())
+            category, created = Category.objects.get_or_create(
+                parent=category_concept,
+                child=new_concept)
+            items += [new_concept]
+        _list = List(items, category_concept)
+        self.remember('LIST', _list)
+        self.remember('LIST OF %s' % category_concept.name, _list)
+
+    def process_range(self, parsed_sentence):
+        concept1, sws1, adj, concept2, sws2, concept3 = tuple(parsed_sentence)
+        category, created = Category.objects.get_or_create(parent=concept2,
+                                                           child=concept1)
+        print category
+        group, created = Group.objects.get_or_create(
+            parent_concept=concept3,
+            child_concept=concept2)        
+        print group
+        group_instance, created = GroupInstance.objects.get_or_create(
+            group=group,
+            parent_concept=concept3,
+            child_concept=concept1)
+        print group_instance
+
+    def process_is_verb_as(self, parsed_sentence):
+        concept1, sw1, verb, sw2, concept2 = tuple(parsed_sentence[:5])
+        relation = get_object_or_None(Relation, name="IsA")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2)
+        self.add_assertion(assertion)
+        category, created = Category.objects.get_or_create(
+            parent=concept2,
+            child=concept1)
+        self.add_category(category)
+
+    def process_apostrophe(self, parsed_sentence):
+        concept1, punc, sw, concept2 = tuple(parsed_sentence[:4])
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2)
+        self.add_assertion(assertion)
+
+    def process_add_quoted_concept(self, parsed_sentence):
+        items = tuple(parsed_sentence[3:])
+        print items
+        item_strings = []
+        for item in items:
+            item_strings += [self.word_mgr.get_string(item)]
+        concept, created = Concept.objects.get_or_create(
+            name=' '.join(item_strings))
+        self.add_concept(concept)
+
+    def process_switch_context(self, parsed_sentence):
+        context_concept = parsed_sentence[2]
+        if self.thinker:
+            new_context, created = Context.objects.get_or_create(concept=context_concept)
+            self.thinker.context = new_context
+            print 'Switched context to %s' % self.thinker.context
+
+    def process_into(self, parsed_sentence):
+        verb, concept1, sw, concept2 = tuple(parsed_sentence)
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=concept1,
+            verb=verb,
+            concept2=concept2)
+        self.add_verb_construct(verb_construct)
+
+    def process_cvca(self, parsed_sentence):
+        c1, verb, c2, adj, x = tuple(parsed_sentence)
+        relation = get_object_or_None(Relation, name='HasProperty')
+        assertion, created = Assertion.objects.get_or_create(
+           concept1=c2,
+           relation=relation,
+           adj2=adj)
+        self.add_assertion(assertion)
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=verb,
+            assertion2=assertion)
+        self.add_verb_construct(verb_construct)
+
+    def process_group_size(self, parsed_sentence):
+        number, c1, sws, c2 = parsed_sentence
+        group, created = Group.objects.get_or_create(
+            parent_concept=c2,
+            child_concept=c1,
+            size=number.number)
+        self.add_group(group)
+        self.reinterpret()
+
+    def process_rank(self, parsed_sentence):
+        c1, sws, number, c2, sw_s, c3 = parsed_sentence
+        group, created = Group.objects.get_or_create(
+            parent_concept=c3,
+            child_concept=c2)
+        self.add_group(group)
+        group_instance, created = GroupInstance.objects.get_or_create(
+            group=group,
+            parent_concept=c3,
+            child_concept=c1,
+            rank=number.number)
+        self.add_group_instance(group_instance)
+
+    def process_show_mind(self, item_group, before, after):
+        print self.thinker.computer_mind
+        
+    def process_remove_concept(self, item_group, before, after):
+        remove_concept, c, concept = tuple(item_group)
+        concept.delete()
+        print 'Removed %s' % concept
+
+    def process_subtract_concept(self, item_group, before, after):
+        verb, concept, away_concept = item_group
+        item = self.recall(concept)
+        if item:
+            print 'Recalled %s' % item
+            if isinstance(item, List):
+                new_list = None
+                for i, list_item in enumerate(item.items):
+                    if list_item.name == concept.name:
+                        new_list = List(item.items[:i] + item.items[i+1:])
+                        self.remember(new_list)
+                        break
+            #print 'Removing %s from %s' % (concept, item)
+
+    def process_c_v_vc(self, item_group, before, after):
+        concept, verb, verb_construct = item_group
+        meta_verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=concept,
+            verb=verb,
+            verb_construct2=verb_construct)
+        self.add_verb_construct(meta_verb_construct)
+
+    def process_list_in(self, parsed_sentence, before, after):
+        _list, sws, concept = tuple(parsed_sentence)
+        new_group, created = Group.objects.get_or_create(
+           parent_concept=concept,
+           child_concept=_list.type)
+        print new_group
+        for item in _list.items:
+            try:
+                new_group_instance, created = GroupInstance.objects.get_or_create(
+                    group=new_group,
+                    parent_concept=concept,
+                    child_concept=item)
+                print new_group_instance
+            except:
+                print 'Warning %s did not add' % item
+
+    def process_list_are(self, parsed_sentence, before, after):
+        _list, sw, concept = tuple(parsed_sentence)
+        concept = self.word_mgr.get_singular_concept(concept)
+        for item in _list.items:
+            category, created = Category.objects.get_or_create(
+                parent=concept,
+                child=item)
+            self.add_category(category)
+
+    def process_ask_question(self, parsed_sentence, before, after):
+        instances_explored = set()
+        categories_explored = set()
+
+        property_assertions = Assertion.objects.filter(
+            relation__name="HasProperty").all()[:1000]
+
+        for property_assertion in property_assertions:
+            if property_assertion.concept1.name in instances_explored:
+                continue
+            instances_explored.add(property_assertion.concept1.name)
+            if property_assertion.concept2.name in categories_explored:
+                continue
+            categories_explored.add(property_assertion.concept2.name)
+
+            print ''
+            print property_assertion
+
+            property_name = property_assertion.concept2.name
+            similar_assertions = Assertion.objects.filter(
+                relation__name="HasProperty",
+                concept2__name=property_name).all()
+            instance_names = set([a.concept1.name for a in similar_assertions])
+            if len(instance_names) > 1:
+                print 'Some examples of things that are %s are %s' % (property_name, list(instance_names)[:3])
+                #print instance_names
+                similarities = {}
+                for instance_name in instance_names:
+                    is_a_assertions = Assertion.objects.filter(
+                        concept1__name=instance_name,
+                        relation__name="IsA").all()
+                    if is_a_assertions:
+                        #print 'Some examples that are %s' % (instance_name, [a.concept2.name for a in is_a_assertions][:5])
+                        for is_a_assertion in is_a_assertions:
+                            category_name = is_a_assertion.concept2.name
+                            if category_name != property_name:
+                                similarities[category_name] = similarities.get(category_name, 0) + 1
+                            
+                if similarities:
+                    sorted_similarities = sorted(similarities.iteritems(), key=operator.itemgetter(1), reverse=True)
+                    #print sorted_similarities
+                    highest = sorted_similarities[0]
+                    if highest[1] > 1:
+                        print 'Many things that HasProperty %s are %s' % (property_name, highest[0])
+                        print 'Are all %s %s?' % (property_name, highest[0])
+
+    def process_has(self, triple, before, after):
+        concept1, stopword, concept2 = triple
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2)
+        self.add_assertion(assertion)        
+
+    def process_is(self, triple, before, after):
+        concept1, stopword, concept2 = triple
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2,
+            context=self.get_context())
+        self.add_assertion(assertion)
+        return assertion
+        #self.causation.consider_implications(assertion)
+        #return assertion
+
+    def process_on(self, triple, before, after):
+        concept1, sw, concept2 = triple
+        group, created = Group.objects.get_or_create(
+            parent_concept=concept2,
+            child_concept=self.word_mgr.get_singular_concept(concept1))
+        print group
+
+    def process_of_the(self, trigram, before, after):
+        concept1, sws, concept2 = trigram
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept2,
+            relation=relation,
+            concept2=concept1)
+        self.add_assertion(assertion)
+        group, created = Group.objects.get_or_create(
+            parent_concept=concept2,
+            child_concept=concept1)
+        self.add_group(group)
+
+    def process_is_a(self, triple, before, after):
+        concept1, stopword, concept2 = triple
+        relation = get_object_or_None(Relation, name="IsA")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=concept1,
+            relation=relation,
+            concept2=concept2)
+        if created:
+           print 'Created %s' % assertion
+        new_category, created = Category.objects.get_or_create(
+            parent=concept2,
+            child=concept1)
+        if created:
+            print 'Created %s' % new_category
+        return assertion, new_category
+
+    def process_is_not_a(self, triple, before, after):
+        concept1, sws, concept2 = triple
+        assertions = Assertion.objects.filter(
+            concept1=concept1,
+            relation__name="IsA",
+            concept2=concept2)
+        if assertions:
+            for assertion in assertions:
+                assertion.delete()
+            print 'Removed %s' % assertions[0]
+
+    def process_is_not(self, triple, before, after):
+        concept1, sws, concept2 = triple
+        assertions = Assertion.objects.filter(
+            concept1=concept1,
+            relation__name="HasProperty",
+            concept2=concept2)
+        if assertions:
+            for assertion in assertions:
+                assertion.delete()
+            print 'Removed %s' % assertions[0]
+
+    def process_add_concept(self, triple, before, after):
+        concept_name = triple[2]
+        concept, created = Concept.objects.get_or_create(
+            name=concept_name)
+        if created:
+            print 'Created %s' % concept
+        return concept
+
+    def process_list_concepts(self, triple, before, after):
+        concept = triple[2]
+        assertions = Assertion.objects.filter(
+            relation__name="IsA",
+            concept2=concept).all()[:100]
+        group_concepts = GroupInstance.objects.filter(
+            parent_concept=concept).all()[:100]
+        all_concepts = list(group_concepts) + [a.concept1 for a in assertions]
+        print all_concepts
+        return all_concepts
+        
+    def process_verb(self, triple, before, after):
+        concept1, verb, concept2 = triple
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=concept1,
+            verb=verb,
+            concept2=concept2,
+            context=self.get_context())
+        self.add_verb_construct(verb_construct)
+        return verb_construct
+
+    def process_verb_amount(self, triple, before, after):
+        concept1, verb, amount2 = triple
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=concept1,
+            verb=verb,
+            amount2=amount2,
+            context=self.get_context())
+        self.add_verb_construct(verb_construct)
+        return verb_construct
+
+    def process_cause(self, triple, before, after):
+        concept1, verb, concept2 = triple
+        if_stmt, created = IfStmt.objects.get_or_create(
+            concept1=concept1,
+            concept2=concept2)
+        print if_stmt
+        return if_stmt
+
+    def add_concept(self, concept):
+        self.learned['concepts'] = self.learned.get('concepts', [])
+        if concept not in self.learned.get('concepts', []):
+            self.learned['concepts'] += [concept]
+
+    def add_assertion(self, assertion):
+        self.learned['assertions'] = self.learned.get('assertions', [])
+        if assertion not in self.learned.get('assertions', []):
+            self.learned['assertions'] += [assertion]
+
+    def add_category(self, category):
+        self.learned['categories'] = self.learned.get('categories', [])
+        if category not in self.learned.get('categories', []):
+            self.learned['categories'] += [category]
+
+    def add_verb_construct(self, verb_construct):
+        key_name = 'verb constructs'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if verb_construct not in self.learned.get(key_name, []):
+            self.learned[key_name] += [verb_construct]        
+
+    def add_verb(self, verb):
+        key_name = 'verbs'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if verb not in self.learned.get(key_name, []):
+            self.learned[key_name] += [verb]
+
+    def add_if_stmt(self, if_stmt):
+        key_name = 'if statements'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if if_stmt not in self.learned.get(key_name, []):
+            self.learned[key_name] += [if_stmt]
+
+    def add_group(self, group):
+        key_name = 'groups'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if group not in self.learned.get(key_name, []):
+            self.learned[key_name] += [group]
+
+    def add_group_instance(self, group_instance):
+        key_name = 'group instances'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if group_instance not in self.learned.get(key_name, []):
+            self.learned[key_name] += [group_instance]
+
+    def remember(self, item):
+        if self.thinker:
+            self.thinker.remember(item)
+
+    def recall(self, item):
+        if self.thinker:
+            return self.thinker.recall(item)
+
+    def get_context(self):
+        if self.thinker:
+            return self.thinker.context

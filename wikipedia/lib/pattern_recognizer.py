@@ -1,4 +1,4 @@
-from wikipedia.models import Concept, Connection, StopwordSequence, Verb, Assertion, VerbConstruct, List, Adjective
+from wikipedia.models import *
 from wikipedia.lib.parser import Stopword
 
 class PatternRecognizer():
@@ -38,8 +38,12 @@ class PatternRecognizer():
             if arg.startswith("CONCEPT"):
                 if isinstance(item, Concept):
                     if ':' in arg:
-                        if item.name != arg.split(':')[1]:
-                            return False
+                        if '_' in item.name:
+                            if item.name != ' '.join(arg.split(':')[1].split('_')):
+                                return False
+                        else:
+                            if item.name != arg.split(':')[1]:
+                                return False
                 else:
                     return False
                 continue
@@ -67,6 +71,28 @@ class PatternRecognizer():
                 else:
                     return False
                 continue
+            if arg.startswith("PUNC"):
+                if isinstance(item, Punctuation):
+                    if ':' in arg:
+                        if item.name != arg.split(':')[1]:
+                            return False
+                else:
+                    return False
+                continue
+            if arg.startswith("NUMBER"):
+                if isinstance(item, Number):
+                    if ':' in arg:
+                        if item.name != arg.split(':')[1]:
+                            return False
+                else:
+                    return False
+                continue
+            if arg.startswith("TIME"):
+                if not isinstance(item, Time):
+                    return False
+            if arg.startswith("AMOUNT"):
+                if not isinstance(item, Amount):
+                    return False
             if arg.startswith("LIST"):
                 if not isinstance(item, List):
                     return False

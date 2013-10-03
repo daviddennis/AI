@@ -1,11 +1,12 @@
 from django.core.management.base import BaseCommand, CommandError
-from wikipedia.models import Concept, Connection, Assertion, Relation
+from wikipedia.models import *
 from wikipedia.lib.parser import Parser, Stopword
 from wikipedia.lib.interpreter import Interpreter
 from wikipedia.lib.query_mgr import QueryManager
 from wikipedia.lib.nlp_gen import NLPGenerator
 from wikipedia.lib.causation import CausationManager
 from wikipedia.lib.thought_processor import ThoughtProcessor
+from wikipedia.lib.word_mgr import WordManager
 from sys import stdout
 from time import sleep
 import sys
@@ -16,13 +17,16 @@ class Command(BaseCommand):
     computer_mind = {}
     user_mind = {}
 
+    context = None
+
     def handle(self, *args, **options):
+        self.word_mgr = WordManager()
         interpreter = Interpreter()
         query_mgr = QueryManager()
         nlp_generator =  NLPGenerator()
         causation = CausationManager()
         thought_processor = ThoughtProcessor()
-
+        interpreter.thought_processor = thought_processor
         interpreter.causation = causation
 
         if 'verbs' in args:
@@ -56,9 +60,17 @@ class Command(BaseCommand):
             interpretations = interpreter.interpret(parsed_sentence, thinker=self)
             interpreter.clear_interpretations()
 
+            print interpreter.one_item
+
+            num_interpretations = len(interpretations)
+            print '# interpretations: %s' % num_interpretations
+            
+            if num_interpretations < 30:
+                print interpretations
+
             print '----'*5
             for interpretation in interpretations:
-                print interpretation
+                #print interpretation
                 if query_mgr.is_query(interpretation):
                     print ':Query'
                     query = query_mgr.construct_query(interpretation)
@@ -66,32 +78,34 @@ class Command(BaseCommand):
                     answer_sentence = nlp_generator.deparse(answer)
                     print '\n:: %s\n' % (answer_sentence)
                 else:
-                    print ':Instruction'
-                    thought_processor.process_thought(interpretation)
+                    #print ':Instruction'
+                    thought_processor.process_thought(interpretation, thinker=self)
                 #self.process_thought(interpretation)
 
-            #self.store_concepts(latest)
+            print thought_processor.learned
+            thought_processor.learned = {}
 
-            # if query_mgr.is_query(parsed_sentence):
-            #     print ':Query'
-            #     query = query_mgr.construct_query(parsed_sentence)
-            #     answer = query_mgr.process_query(query)
-            #     answer_sentence = nlp_generator.deparse(answer)
-            #     print '\n:: %s\n' % (answer_sentence)
-            # elif causation.is_if_statement(parsed_sentence):
-            #     print ':Instruction'
-            #     if_stmt = interpreter.process_if(parsed_sentence, causation=causation)
-            #     print '\n:: %s\n' % (if_stmt)
-            # else:
-            #     print ':Instruction'
-            #     thought = interpreter.interpret(parsed_sentence, thinker=self)
-            #     print thought
-                #if thought:
-                #    self.add_thought(thought)
+            #self.store_concepts(latest)
                 
         print '\nGoodbye.\n'
         return
 
+    def remember(self, item):
+        if isinstance(item, Concept):
+            self.computer_mind[item.name] = item
+        elif isinstance(item, Amount):
+            self.computer_mind[item.concept.name] = item
+        elif isinstance(item, List):
+            self.computer_mind[item.type.name] = item
+
+    def recall(self, item):
+        if isinstance(item, Concept):
+            for word_form in self.word_mgr.get_forms(item):
+                #print word_form
+                recalled_item = self.computer_mind.get(word_form)
+                if recalled_item:
+                    return recalled_item
+        #elif isinstance
     
     def add_thought(self, thought):
         self.my_mind[thought[0].name] = thought[1]
