@@ -24,6 +24,7 @@ class ThoughtProcessor():
             # 'group instances': [],
             # 'aliases': []
             # }
+        self.interpretations = []
 
     def process_thought(self, parsed_sentence, thinker=None):
         self.thinker = thinker
@@ -64,6 +65,8 @@ class ThoughtProcessor():
             self.process_group(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "CONCEPT VERB CONCEPT SW:to VERB CONCEPT"):
             self.process_to(parsed_sentence)
+        if self.pr.recognize(parsed_sentence, "CONCEPT SW VERB PREPOSITION VERB"):
+            self.process_prep(parsed_sentence)
 
         return output
 
@@ -83,6 +86,8 @@ class ThoughtProcessor():
             after = parsed_sentence[i+2:]
             if self.pr.recognize(bigram, "NUMBER CONCEPT"):
                 self.process_bigram_amount(bigram, before, after)
+            if self.pr.recognize(bigram, "SW VERBCONSTRUCT"):
+                self.process_bigram_question_fragment(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         output = []
@@ -156,13 +161,16 @@ class ThoughtProcessor():
         return output
 
     def process_4grams(self, parsed_sentence):
-        # item_groups = [(w,x,y,z) for w,x,y,z in zip(parsed_sentence, 
-        #                                             parsed_sentence[1:], 
-        #                                             parsed_sentence[2:],
-        #                                             parsed_sentence[3:])]
-        # for i, item_group in enumerate(item_groups):
-        #     before = parsed_sentence[:i]
-        #     after = parsed_sentence[i+4:]
+        item_groups = [(w,x,y,z) for w,x,y,z in zip(parsed_sentence, 
+                                                    parsed_sentence[1:], 
+                                                    parsed_sentence[2:],
+                                                    parsed_sentence[3:])]
+        for i, _4gram in enumerate(item_groups):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+4:]
+            if self.pr.recognize(_4gram, "NUMBER CONCEPT SWS:of_the CONCEPT"):
+                self.process_group_size(_4gram, before, after)
+            
         if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
             self.process_if(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "SW:if VERBCONSTRUCT SW:then ASSERTION"):
@@ -175,8 +183,6 @@ class ThoughtProcessor():
             self.process_apostrophe(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "VERB CONCEPT SW:into CONCEPT"):
             self.process_into(parsed_sentence)
-        if self.pr.recognize(parsed_sentence, "NUMBER CONCEPT SWS:of_the CONCEPT"):
-            self.process_group_size(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "CONCEPT VERB:have NUMBER CONCEPT"):
             self.process_group_size_2(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "CONCEPT SWS:is_a ADJECTIVE CONCEPT"):
@@ -262,8 +268,21 @@ class ThoughtProcessor():
             concept2=c3)
         self.add_verb_construct(verb_construct1)
         self.add_verb_construct(verb_construct2)
-        self.process_if([Stopword('IF'), verb_construct1, Stopword('THEN'), verb_construct2])
+        #self.process_if([Stopword('IF'), verb_construct1, Stopword('THEN'), verb_construct2])
 
+    def process_prep(self, parsed_sentence):
+        c1, sw, v1, prep, v2 = parsed_sentence[:5]
+        complex_verb, created = ComplexVerb.objects.get_or_create(
+            verb=v1,
+            preposition=prep)
+        v2_as_concept = self.word_mgr.verb_to_concept(v2)
+        if v2_as_concept:
+            verb_construct, created = VerbConstruct.objects.get_or_create(
+                concept1=c1,
+                complex_verb=complex_verb,
+                concept2=v2_as_concept)
+            self.add_verb_construct(verb_construct)
+            
     def process_amount(self, amount, before, after):
         self.remember(amount)
 
@@ -276,6 +295,14 @@ class ThoughtProcessor():
             number=number.number,
             concept=concept)
         self.add_amount(amount)
+
+    def process_bigram_question_fragment(self, bigram, before, after):
+        sw, verb_construct = bigram
+        if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
+            question_fragment, created = QuestionFragment.objects.get_or_create(
+                q_word=sw.name,
+                verb_construct=verb_construct)
+            self.add_item(question_fragment)
 
     def process_if(self, parsed_sentence):
         _if, item1, then, item2 = tuple(parsed_sentence)
@@ -399,14 +426,14 @@ class ThoughtProcessor():
             assertion2=assertion)
         self.add_verb_construct(verb_construct)
 
-    def process_group_size(self, parsed_sentence):
-        number, c1, sws, c2 = parsed_sentence
+    def process_group_size(self, _4gram, before, after):
+        number, c1, sws, c2 = _4gram
         group, created = Group.objects.get_or_create(
             parent_concept=c2,
             child_concept=c1,
             size=number.number)
         self.add_group(group)
-        #self.reinterpret()
+        self.reinterpret(before + [group] + after)
 
     def process_group_size_2(self, parsed_sentence):
         c1, verb, number, c2 = parsed_sentence
@@ -727,6 +754,22 @@ class ThoughtProcessor():
         self.learned[key_name] = self.learned.get(key_name, [])
         if amount not in self.learned.get(key_name, []):
             self.learned[key_name] += [amount]
+
+    def add_item(self, item):
+        key_name = item.__class__.__name__.lower() + 's'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if item not in self.learned.get(key_name, []):
+            self.learned[key_name] += [item]
+
+    def reinterpret(self, interpretation):
+        if interpretation not in self.interpretations:
+            self.interpretations += [interpretation]
+
+    def get_interpretations(self):
+        return self.interpretations
+    
+    def clear_interpretations(self):
+        self.interpretations = []
 
     def remember(self, item):
         if self.thinker:

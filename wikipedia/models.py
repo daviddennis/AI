@@ -9,6 +9,8 @@ class Concept(models.Model):
 
     time_keyword = None
 
+    hit = 0
+
     def __unicode__(self):
         if self.time_keyword:
             return self.name + ' at ' + self.time_keyword
@@ -126,6 +128,7 @@ class Assertion(models.Model):
             orig += " in the context of %s" % self.context.concept.name
         return orig
 
+# NL Structure
 class Amount(models.Model):
     number = models.FloatField()
     concept = models.ForeignKey(Concept, related_name="amount_set")
@@ -137,36 +140,74 @@ class Amount(models.Model):
         else:
             return "%d %s" % (self.number, self.concept)
 
+# Lookup
+class Preposition(models.Model):
+    name = models.CharField(max_length=60, null=True, blank=True)
+    
+    def __unicode__(self):
+        return self.name
+
+# Lookup
 class Verb(models.Model):
     name = models.CharField(max_length=500)
     past_name = models.CharField(max_length=500, null=True, blank=True)
     participle_name = models.CharField(max_length=100, null=True, blank=True)
     
-    def __unicode__(self):
-        return "%s" % (self.name)
+    form = None
 
+    def __unicode__(self):
+        form = self.form
+        if form:
+            if form == 'past':
+                return "%s" % (self.past_name)
+            elif form == 'participle':
+                return "%s" % (self.participle_name)
+            else:
+                return "%s" % (self.name)
+        else:
+            return "%s" % (self.name)
+
+class ComplexVerb(models.Model):
+    verb = models.ForeignKey(Verb)
+    preposition = models.ForeignKey(Preposition)
+
+    def __unicode__(self):
+        return "%s %s" % (self.verb.name, self.preposition.name)
+
+# NL Structure
 class VerbConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
-    verb = models.ForeignKey(Verb)
+    
+    verb = models.ForeignKey(Verb, null=True, blank=True)
+    complex_verb = models.ForeignKey(ComplexVerb, null=True, blank=True)
+    
     concept2 = models.ForeignKey(Concept, related_name="verb_2_set", null=True, blank=True)
     amount2 = models.ForeignKey(Amount, related_name="amount_2_set", null=True, blank=True)
     assertion2 = models.ForeignKey(Adjective, related_name="vc_adj_2_set", null=True, blank=True)
+    question_fragment2 = models.ForeignKey('QuestionFragment', related_name="qf_2_set", null=True, blank=True)
     verb_construct2 = models.ForeignKey('self', related_name='vc_2_set', null=True, blank=True)
 
     context = models.ForeignKey(Context, related_name="verb_context_set", null=True, blank=True)
 
     def __unicode__(self):
+        if self.verb:
+            verb_name = self.verb.name
+        elif self.complex_verb:
+            verb_name = str(self.complex_verb)
+
         if self.concept1 and self.concept2:
-            return "%s(%s, %s)" % (self.verb.name, self.concept1.name, self.concept2.name)
+            return "%s(%s, %s)" % (verb_name, self.concept1.name, self.concept2.name)
         else:
             if self.amount2:
-                return "%s(%s, %s)" % (self.verb.name, self.concept1.name, self.amount2)
+                return "%s(%s, %s)" % (verb_name, self.concept1.name, self.amount2)
             else:
                 if self.verb_construct2:
-                    return "%s(%s, %s)" % (self.verb.name, self.concept1.name, self.verb_construct2)
+                    return "%s(%s, %s)" % (verb_name, self.concept1.name, self.verb_construct2)
                 else:
-                    return "%s(%s)" % (self.verb.name, (self.concept1 or self.concept2).name)
+                    return "%s(%s)" % (verb_name, (self.concept1 or self.concept2).name)
 
+
+# NL Structure
 class IfStmt(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="concept_1_set", null=True, blank=True)
     assertion1 = models.ForeignKey(Assertion, related_name="if_1_ass_set", null=True, blank=True)
@@ -179,6 +220,14 @@ class IfStmt(models.Model):
         arg1 = self.vc1 or self.assertion1 or self.concept1
         arg2 = self.vc2 or self.assertion2 or self.concept2
         return "IF: %s -> %s" % (arg1, arg2)
+
+
+class QuestionFragment(models.Model):
+    q_word = models.CharField(max_length=50)
+    verb_construct = models.ForeignKey(VerbConstruct)
+
+    def __unicode__(self):
+        return "%s-%s" % (self.q_word, self.verb_construct)
 
 
 # class SentenceRecord

@@ -15,7 +15,7 @@ class QueryManager():
         if len(latest) <= 1:
             return False
         if isinstance(latest[-1], Punctuation):
-            if latest[-1].string == "?":
+            if latest[-1].name == "?":
                 return True
         item = latest[0]
         if isinstance(item, StopwordSequence):

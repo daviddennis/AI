@@ -79,6 +79,7 @@ class Parser():
                                         remaining += [' '.join(subitems[1:])]
             
             if remaining == ['']:
+                latest = before
                 break
             else:
                 latest = before + remaining
@@ -147,7 +148,7 @@ class Parser():
         number_token = tokens[0]
         if number_token in self.text_numbers:
             return ([Number(self.text_numbers[number_token])] + [' '.join(tokens[1:])], True)
-        number_token = number_token.replace('ST','').replace('ND','').replace('RD','')
+        number_token = number_token.replace('ST','').replace('ND','').replace('RD','').replace('TH','')
         number_set = set([str(x) for x in range(9)])
         is_number = True
         for c in number_token:
@@ -176,11 +177,13 @@ class Parser():
         participle = False
         if verb_or_none:
             verb = verb_or_none
+            verb.form = 'past'
             past = True
         else:
             verb_or_none = get_object_or_None(Verb, participle_name=tokens[0])
             if verb_or_none:
                 verb = verb_or_none
+                verb.form = 'participle'
                 participle = True
             else:
                 verb_or_none = get_object_or_None(Verb, name=tokens[0])

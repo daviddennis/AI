@@ -9,7 +9,13 @@ class TimeManager():
         self.time_terms += [x + 'S' for x in self.time_terms]
         self.time_terms = set(self.time_terms)
 
-    def recognize_time(self, string):
+    def recognize_time(self, item):
+        string = None
+        if isinstance(item, str) or isinstance(item, unicode):
+            string = item
+        else:
+            string = item.name
+
         tokens = string.split(' ')
         for token in tokens:
             if token in self.time_terms:

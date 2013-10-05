@@ -6,6 +6,7 @@ from wikipedia.lib.query_mgr import QueryManager
 from wikipedia.lib.nlp_gen import NLPGenerator
 from wikipedia.lib.causation import CausationManager
 from wikipedia.lib.thought_processor import ThoughtProcessor
+from wikipedia.lib.medium_thought_processor import MediumThoughtProcessor
 from wikipedia.lib.word_mgr import WordManager
 from sys import stdout
 from time import sleep
@@ -26,6 +27,7 @@ class Command(BaseCommand):
         nlp_generator =  NLPGenerator()
         causation = CausationManager()
         thought_processor = ThoughtProcessor()
+        medium_thought_processor = MediumThoughtProcessor()
         interpreter.thought_processor = thought_processor
         interpreter.causation = causation
 
@@ -66,9 +68,12 @@ class Command(BaseCommand):
             print '# interpretations: %s' % num_interpretations
             
             if num_interpretations < 100:
-                print interpretations
+                for x in interpretations:
+                    print x
 
-            print '----'*5
+            if interpretations:
+                print '----'*5 + ' FIRST LEVEL'
+            thoughts = []
             for interpretation in interpretations:
                 #print interpretation
                 if query_mgr.is_query(interpretation):
@@ -80,11 +85,25 @@ class Command(BaseCommand):
                 else:
                     #print ':Instruction'
                     thought_processor.process_thought(interpretation, thinker=self)
-                #self.process_thought(interpretation)
+                    thoughts += thought_processor.get_interpretations()
+                    thought_processor.clear_interpretations()
 
             for key, val in thought_processor.learned.iteritems():
                 print key,':',val
             thought_processor.learned = {}
+
+            if thoughts:
+                print '----'*5 + ' SECOND LEVEL'
+                for thought in thoughts:
+                    print thought
+                    medium_thought_processor.process_thought(thought, thinker=self)
+
+                print '----'*5
+                for key, val in medium_thought_processor.learned.iteritems():
+                    print key,':',val
+                medium_thought_processor.learned = {}
+
+            print '\n\n'
 
             #self.store_concepts(latest)
                 

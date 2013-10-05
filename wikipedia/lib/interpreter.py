@@ -105,17 +105,33 @@ class Interpreter():
             if self.pr.recognize(bigram, "SW:that CONCEPT"):
                 self.bigram_recall(bigram, before, after)
             if self.pr.recognize(bigram, "NUMBER CONCEPT"):
-                self.bigram_amount(bigram, before, after)
+                self.bigram_amount_or_time(bigram, before, after)
             if self.pr.recognize(bigram, "SW SW"):
                 self.bigram_sw(bigram, before, after)
             if self.pr.recognize(bigram, "SW:the CONCEPT:way"):
                 self.bigram_exclude(bigram, before, after)
+            if self.pr.recognize(bigram, "VERB SW"):
+                self.bigram_verb_prep(bigram, before, after)
+
 
     def interpret_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
         for i, trigram in enumerate(trigrams):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+3:]
+            if self.pr.recognize(trigram, "CONCEPT VERB CONCEPT"):
+                self.trigram_verb_construct(trigram, before, after)
+
+            # List formation
+            if self.pr.recognize(trigram, "CONCEPT PUNC:, CONCEPT"):
+                self.trigram_punc_list(trigram, before, after)
+            if self.pr.recognize(trigram, "LIST PUNC:, CONCEPT"):
+                self.trigram_concat_list(trigram, before, after)
+            if self.pr.recognize(trigram, "LIST SW:and CONCEPT"):
+                self.trigram_and_list(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:and CONCEPT"):
+                self.trigram_and_to_list(trigram, before, after)
+
             if self.pr.recognize(trigram, "VERB SWS:to_the CONCEPT"):
                 self.trigram_to_the(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_an CONCEPT"):
@@ -179,15 +195,23 @@ class Interpreter():
                 self._5gram_by(_5gram, before, after)
 
     def interpret_6grams(self, parsed_sentence):
-        pass
-        # _5grams = [(v,w,x,y,z) for v,w,x,y,z in zip(parsed_sentence, 
-        #                                             parsed_sentence[1:],
-        #                                             parsed_sentence[2:],
-        #                                             parsed_sentence[3:],
-        #                                             parsed_sentence[4:])]
-        # for i, _5gram in enumerate(_5grams):
-        #     before = parsed_sentence[:i]
-        #     after = parsed_sentence[i+6:]
+
+        return
+
+        _6grams = [(u,v,w,x,y,z) for u,v,w,x,y,z in zip(parsed_sentence, 
+                                                        parsed_sentence[1:],
+                                                        parsed_sentence[2:],
+                                                        parsed_sentence[3:],
+                                                        parsed_sentence[4:],
+                                                        parsed_sentence[5:])]
+        for i, _6gram in enumerate(_6grams):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+6:]
+            if self.pr.recognize(_6gram, "CONCEPT SW VERB SW CONCEPT SW:to"):
+               self._6gram_c_v_c_to(_6gram, before, after)
+            #if self.pr.recognize(_6gram, "CONCEPT SW:is VERB SW VERB CONCEPT"):
+            #    self._6gram_verb_prep(_6gram, before, after)
+
 
     def interpret_7grams(self, parsed_sentence):
         _7grams = [(t,u,v,w,x,y,z) for t,u,v,w,x,y,z in zip(parsed_sentence, 
@@ -251,7 +275,10 @@ class Interpreter():
             new_concept_name = concept.name.replace('THE ','',1)
             new_concept = get_object_or_None(Concept, name=new_concept_name)
             if new_concept:
-                self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
+                if concept.hit < 1:
+                    concept.hit += 1
+                    new_concept.hit += 1
+                    self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
         if self.time_mgr.recognize_time(concept.name):
             self.add_interpretation(before + [Time(concept.name)] + after)
 
@@ -286,7 +313,10 @@ class Interpreter():
         bigram = list(bigram)
         concept_as_the = get_object_or_None(Concept, name='the '.upper() + concept.name)
         if concept_as_the:
-            self.add_interpretation(before + [concept_as_the] + after)
+            if concept.hit < 1:
+                concept.hit += 1
+                concept_as_the.hit += 1
+                self.add_interpretation(before + [concept_as_the] + after)
 
     def bigram_a(self, bigram, before, after):
         sw, concept = bigram
@@ -318,18 +348,56 @@ class Interpreter():
         if item:
             self.add_interpretation(before + [item] + after)
 
-    def bigram_amount(self, bigram, before, after):
+    def bigram_amount_or_time(self, bigram, before, after):
         number, concept = tuple(bigram)
+
+        amount, created = Amount.objects.get_or_create(
+            number=number.number,
+            concept=concept)
+        self.add_interpretation(before + [amount] + after)
+
+        if self.time_mgr.recognize_time(concept):
+            time = Time("%s %s" % (int(number.number), concept.name))
+            self.add_interpretation(before + [time] + after)
+
         if number.number.is_integer() and number.number < 1000:
             concept = self.word_mgr.get_singular_concept(concept)
             _list = List([concept for i in xrange(int(number.number))])
             self.add_interpretation(before + [_list] + after)
-        else:
-            amount, created = Amount.objects.get_or_create(
-                number=number.number,
-                concept=concept)
-            self.add_interpretation(before + [amount] + after)
 
+    def bigram_verb_prep(self, bigram, before, after):
+        verb, sw = bigram
+        prep = get_object_or_None(Preposition, name=sw.name)
+        if prep:
+            self.add_interpretation(before + [verb, prep] + after)
+
+    def trigram_verb_construct(self, trigram, before, after):
+        c1, v1, c2 = trigram
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=v1,
+            concept2=c2)
+        self.add_interpretation(before + [verb_construct] + after)
+
+    def trigram_and_to_list(self, trigram, before, after):
+        c1, sw, c2 = trigram
+        new_list = List([c1, c2])
+        self.add_interpretation(before + [new_list] + after)
+
+    def trigram_punc_list(self, trigram, before, after):
+        c1, punc, c2 = trigram
+        _list = List([c1,c2])
+        self.add_interpretation(before + [_list] + after)
+
+    def trigram_concat_list(self, trigram, before, after):
+        _list, punc, c2 = trigram
+        new_list = List(_list.items + [c2])
+        self.add_interpretation(before + [new_list] + after)
+
+    def trigram_and_list(self, trigram, before, after):
+        _list, sw, c2 = trigram
+        new_list = List(_list.items + [c2])
+        self.add_interpretation(before + [new_list] + after)
 
     def trigram_to_the(self, trigram, before, after):
         verb, sws, concept = trigram
@@ -451,6 +519,16 @@ class Interpreter():
     def _5gram_by(self, _5gram, before, after):
         c1, sw1, verb, sw2, c2 = _5gram
         self.add_interpretation(before + [c2, verb, c1] + after)
+
+    def _6gram_c_v_c_to(self, _6gram, before, after):
+        c1, sw1, v1, sw2, c2, sw_to = _6gram
+        self.add_interpretation(before + [c2, v1, c1, sw_to] + after)
+
+    # def _6gram_verb_prep(_6gram, before, after):
+    #     c1, sw1, v1, sw2, v2, c2 = _6gram
+    #     sub_verb_construct, created = VerbConstruct.objects.get_or_create(
+    #         verb=v2,
+    #         )
 
     def _7gram_what(self,_7gram, before, after):
         c1, sws, c2, v1, sw, v2, c3 = _7gram

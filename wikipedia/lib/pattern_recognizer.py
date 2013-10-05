@@ -87,6 +87,14 @@ class PatternRecognizer():
                 else:
                     return False
                 continue
+            if arg.startswith("PREPOSITION"):
+                if isinstance(item, Preposition):
+                    if ':' in arg:
+                        if item.name != arg.split(':')[1]:
+                            return False
+                else:
+                    return False
+                continue
             if arg.startswith("TIME"):
                 if not isinstance(item, Time):
                     return False

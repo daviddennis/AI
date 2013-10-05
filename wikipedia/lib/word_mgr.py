@@ -59,3 +59,12 @@ class WordManager():
         if string.upper() in self.stop_words:
             return True
         return False
+
+    def verb_to_concept(self, verb):
+        concept = None
+        if verb.form == 'past':
+            return get_object_or_None(Concept, name=verb.past_name)
+        elif verb.form == 'participle':
+            return get_object_or_None(Concept, name=verb.participle_name)
+        elif not verb.form:
+            return get_object_or_None(Concept, name=verb.name)
