@@ -67,6 +67,7 @@ class StopwordSequence(models.Model):
     def __unicode__(self):
         return self.string
 
+
 class Group(models.Model):
     parent_concept = models.ForeignKey(Concept, related_name="abstract_parent_set")
     child_concept = models.ForeignKey(Concept, related_name="abstract_child_set")
@@ -81,24 +82,36 @@ class Group(models.Model):
             val += "*(%d)" % self.size
         return val
 
+
 class GroupInstance(models.Model):
     group = models.ForeignKey(Group, related_name="instance_set")
     parent_concept = models.ForeignKey(Concept, related_name="parent_set")
     child_concept = models.ForeignKey(Concept, related_name="child_set")
-    rank = models.IntegerField(null=True, blank=True)
 
     def __unicode__(self):
-        if self.rank:
-            return "%s -> [%s] (rank: %d)" % (self.parent_concept, self.child_concept, self.rank)
-        else:
-            return "%s -> [%s]" % (self.parent_concept, self.child_concept)
-    
+        return "%s -> [%s]" % (self.parent_concept, self.child_concept)
+
+
+class Rank(models.Model):
+    group_instance = models.ForeignKey(GroupInstance, related_name="rank_set")
+    rank = models.IntegerField()
+    concept = models.ForeignKey(Concept, null=True, blank=True)
+    sws = models.ForeignKey(StopwordSequence, null=True, blank=True)
+
+    def __unicode__(self):
+        if self.concept:
+            if self.sws:
+                return "%s #%s %s %s" % (self.group_instance, self.rank, self.sws, self.concept)
+            else:
+                return "%s #%s %s" % (self.group_instance, self.rank, self.concept)
+
 
 class Relation(models.Model):
     name = models.CharField(max_length=500)
     
     def __unicode__(self):
         return self.name
+
 
 class Adjective(models.Model):
     name = models.CharField(max_length=500)
@@ -113,11 +126,15 @@ class Adjective(models.Model):
         else:
             return self.name
 
+
 class Assertion(models.Model):
-    relation = models.ForeignKey(Relation)
     concept1 = models.ForeignKey(Concept, related_name="assertion_1_set")
+
+    relation = models.ForeignKey(Relation)
+
     concept2 = models.ForeignKey(Concept, related_name="assertion_2_set")
     adj2 = models.ForeignKey(Adjective, related_name="adj_2_set", null=True, blank=True)
+
     score = models.IntegerField(null=True, blank=True)
     frequency = models.FloatField(null=True, blank=True)
     context = models.ForeignKey(Context, related_name="assertion_context_set", null=True, blank=True)
@@ -170,13 +187,18 @@ class Verb(models.Model):
 class ComplexVerb(models.Model):
     verb = models.ForeignKey(Verb)
     preposition = models.ForeignKey(Preposition)
+    prep2 = models.ForeignKey(Preposition, related_name="prep2_set", null=True, blank=True)
 
     def __unicode__(self):
-        return "%s %s" % (self.verb.name, self.preposition.name)
+        if self.prep2:
+            return "%s %s %s" % (self.verb.name, self.preposition.name, self.prep2.name)
+        else:
+            return "%s %s" % (self.verb.name, self.preposition.name)
 
 # NL Structure
 class VerbConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
+    amount1 = models.ForeignKey(Amount, related_name="amount_1_set", null=True, blank=True)
     
     verb = models.ForeignKey(Verb, null=True, blank=True)
     complex_verb = models.ForeignKey(ComplexVerb, null=True, blank=True)
@@ -195,30 +217,35 @@ class VerbConstruct(models.Model):
         elif self.complex_verb:
             verb_name = str(self.complex_verb)
 
-        if self.concept1 and self.concept2:
-            return "%s(%s, %s)" % (verb_name, self.concept1.name, self.concept2.name)
+        item1 = self.concept1 or self.amount1
+
+        if item1 and self.concept2:
+            return "%s(%s, %s)" % (verb_name, item1, self.concept2.name)
         else:
             if self.amount2:
-                return "%s(%s, %s)" % (verb_name, self.concept1.name, self.amount2)
+                return "%s(%s, %s)" % (verb_name, item1, self.amount2)
             else:
                 if self.verb_construct2:
-                    return "%s(%s, %s)" % (verb_name, self.concept1.name, self.verb_construct2)
+                    return "%s(%s, %s)" % (verb_name, item1, self.verb_construct2)
                 else:
-                    return "%s(%s)" % (verb_name, (self.concept1 or self.concept2).name)
+                    return "%s(%s)" % (verb_name, (item1 or self.concept2).name)
 
 
 # NL Structure
 class IfStmt(models.Model):
+
     concept1 = models.ForeignKey(Concept, related_name="concept_1_set", null=True, blank=True)
     assertion1 = models.ForeignKey(Assertion, related_name="if_1_ass_set", null=True, blank=True)
     vc1 = models.ForeignKey(VerbConstruct, related_name="if_1_set", null=True, blank=True)
+
     concept2 = models.ForeignKey(Concept, related_name="concept_2_set", null=True, blank=True)
     assertion2 = models.ForeignKey(Assertion, related_name="if_2_ass_set", null=True, blank=True)
     vc2 = models.ForeignKey(VerbConstruct, related_name="if_2_set", null=True, blank=True)
+    category2 = models.ForeignKey(Category, related_name="category_2_set", null=True, blank=True)
 
     def __unicode__(self):
         arg1 = self.vc1 or self.assertion1 or self.concept1
-        arg2 = self.vc2 or self.assertion2 or self.concept2
+        arg2 = self.vc2 or self.assertion2 or self.concept2 or self.category2
         return "IF: %s -> %s" % (arg1, arg2)
 
 
@@ -228,6 +255,17 @@ class QuestionFragment(models.Model):
 
     def __unicode__(self):
         return "%s-%s" % (self.q_word, self.verb_construct)
+
+
+class PrepConstruct(models.Model):
+    concept1 = models.ForeignKey(Concept, related_name="pc_1_set")
+    preposition = models.ForeignKey(Preposition)
+    concept2 = models.ForeignKey(Concept, related_name="pc_2_set")
+
+    def __unicode__(self):
+        return "%s %s %s" % (self.concept1, 
+                             self.preposition.name.lower(),
+                             self.concept2)
 
 
 # class SentenceRecord

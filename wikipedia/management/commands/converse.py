@@ -19,7 +19,7 @@ class Command(BaseCommand):
     user_mind = {}
 
     context = None
-
+    
     def handle(self, *args, **options):
         self.word_mgr = WordManager()
         interpreter = Interpreter()
@@ -67,9 +67,8 @@ class Command(BaseCommand):
             num_interpretations = len(interpretations)
             print '# interpretations: %s' % num_interpretations
             
-            if num_interpretations < 100:
-                for x in interpretations:
-                    print x
+            for x in interpretations[:100]:
+                print x
 
             if interpretations:
                 print '----'*5 + ' FIRST LEVEL'
@@ -94,8 +93,10 @@ class Command(BaseCommand):
 
             if thoughts:
                 print '----'*5 + ' SECOND LEVEL'
-                for thought in thoughts:
+                for thought in thoughts[:100]:
+                    #if isinstance(thought[0], Category):
                     print thought
+                for thought in thoughts:
                     medium_thought_processor.process_thought(thought, thinker=self)
 
                 print '----'*5
@@ -110,13 +111,26 @@ class Command(BaseCommand):
         print '\nGoodbye.\n'
         return
 
-    def remember(self, item):
+    def remember(self, item, key=None):
+        if len(self.computer_mind) > 30:
+            return
+
+        val = item
         if isinstance(item, Concept):
-            self.computer_mind[item.name] = item
+            key = item.name
         elif isinstance(item, Amount):
-            self.computer_mind[item.concept.name] = item
+            key = item.concept.name
         elif isinstance(item, List):
-            self.computer_mind[item.type.name] = item
+            key = item.type.name
+        elif isinstance(item, Group):
+            if not key:
+                key = item.child_concept.name
+
+        while key in self.computer_mind.keys():
+            key += 'S'
+        
+        self.computer_mind[key] = val
+
 
     def recall(self, item):
         if isinstance(item, Concept):

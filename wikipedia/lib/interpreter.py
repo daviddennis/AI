@@ -13,6 +13,8 @@ group_stopword_seqs = set([x.upper() for x in ["on the", "in the"]])
 
 class Interpreter():
 
+    ref_words = ['IT', 'THEY', 'THEM', 'THIS', 'THESE', 'THAT', 'THOSE']
+
     def __init__(self):
         self.parser = Parser()        
         self.pr = PatternRecognizer()
@@ -31,7 +33,6 @@ class Interpreter():
         #print parsed_sentence
         self.add_interpretation(parsed_sentence)
 
-
         if self.pr.recognize(parsed_sentence, "SW:if ... ... ... SW:then ... ... ..."):
             self.ngram_if(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "STRING SW:is CONCEPT:past CONCEPT:verb SW:of CONCEPT"):
@@ -47,11 +48,7 @@ class Interpreter():
         self.interpret_6grams(parsed_sentence)
         self.interpret_7grams(parsed_sentence)
 
-        # Store Topic
-        for item in parsed_sentence:
-            if isinstance(item, Concept):
-                self.topic = item
-                break
+        self.track_topic(parsed_sentence)
 
         return self.interpretations #self.return_interpretations()
 
@@ -59,6 +56,8 @@ class Interpreter():
         for i, unigram in enumerate(parsed_sentence):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+1:]
+            if self.pr.recognize([unigram], "SW"):
+                self.unigram_prep(unigram, before, after)
             if self.pr.recognize([unigram], "SW:you"):
                 self.unigram_you(unigram, before, after)
             if self.pr.recognize([unigram], "SWS"):
@@ -85,7 +84,8 @@ class Interpreter():
                 self.unigram_we(unigram, before, after)
             if self.pr.recognize([unigram], "SWS:was_a"):
                 self.unigram_was_a(unigram, before, after)
-            #if self.pr.recognize([unigram], "PUNC:,"):
+            if self.pr.recognize([unigram], "PUNC:,"):
+                self.unigram_comma(unigram, before, after)
             #    self.unigram_on_then(unigram, before, after)
             
 
@@ -94,6 +94,8 @@ class Interpreter():
         for i, bigram in enumerate(bigrams):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+2:]
+            if self.pr.recognize(bigram, "CONCEPT:type SW:of"):
+                self.bigram_type_of(bigram, before, after)
             if self.pr.recognize(bigram, "SW:the CONCEPT"):
                 self.bigram_the(bigram, before, after)
             if self.pr.recognize(bigram, "SW:a CONCEPT"):
@@ -112,6 +114,8 @@ class Interpreter():
                 self.bigram_exclude(bigram, before, after)
             if self.pr.recognize(bigram, "VERB SW"):
                 self.bigram_verb_prep(bigram, before, after)
+            if self.pr.recognize(bigram, "SW CONCEPT"):
+                self.bigram_anaphoric_ref(bigram, before, after)
 
 
     def interpret_trigrams(self, parsed_sentence):
@@ -193,6 +197,9 @@ class Interpreter():
                 self._5gram_and(_5gram, before, after)
             if self.pr.recognize(_5gram, "CONCEPT SW:are VERB SW:by CONCEPT"):
                 self._5gram_by(_5gram, before, after)
+            if self.pr.recognize(_5gram, "VERB PREP CONCEPT PREP CONCEPT"):
+                self._5gram_break_complex_verb(_5gram, before, after)
+
 
     def interpret_6grams(self, parsed_sentence):
 
@@ -258,6 +265,10 @@ class Interpreter():
         was_a = get_object_or_None(StopwordSequence, string="was a".upper())
         self.add_interpretation(before + [was_a] + after)
 
+    def unigram_comma(self, unigram, before, after):
+        comma = unigram
+        self.add_interpretation(before + after)
+
     def unigram_i(self, unigram, before, after):
         david_dennis = get_object_or_None(Concept, name="DAVID DENNIS")
         self.add_interpretation(before + [david_dennis] + after)
@@ -293,6 +304,12 @@ class Interpreter():
         is_a = get_object_or_None(StopwordSequence, string="is a".upper())
         self.add_interpretation(before + [is_a] + after)
 
+    def unigram_prep(self, unigram, before, after):
+        sw = unigram
+        prep = get_object_or_None(Preposition, name=sw.name)
+        if prep:
+            self.add_interpretation(before + [prep] + after)
+
     def unigram_you(self, unigram, before, after):
         category, created = Category.objects.get_or_create(
             parent__name="COMPUTER PROGRAM",
@@ -317,6 +334,10 @@ class Interpreter():
                 concept.hit += 1
                 concept_as_the.hit += 1
                 self.add_interpretation(before + [concept_as_the] + after)
+
+    def bigram_type_of(self, bigram, before, after):
+        c1, sw = bigram
+        self.add_interpretation(before + after)
 
     def bigram_a(self, bigram, before, after):
         sw, concept = bigram
@@ -370,6 +391,13 @@ class Interpreter():
         prep = get_object_or_None(Preposition, name=sw.name)
         if prep:
             self.add_interpretation(before + [verb, prep] + after)
+
+    def bigram_anaphoric_ref(self, bigram, before, after):
+        sw, concept = bigram
+        if sw.name in self.ref_words:
+            recalled_item = self.recall(concept)
+            if recalled_item:
+                self.add_interpretation(before + [recalled_item] + after)
 
     def trigram_verb_construct(self, trigram, before, after):
         c1, v1, c2 = trigram
@@ -519,6 +547,11 @@ class Interpreter():
     def _5gram_by(self, _5gram, before, after):
         c1, sw1, verb, sw2, c2 = _5gram
         self.add_interpretation(before + [c2, verb, c1] + after)
+
+    def _5gram_break_complex_verb(self, _5gram, before, after):
+        verb, prep1, c1, prep2, c2 = _5gram
+        self.add_interpretation(before + [verb, prep1, c1] + after)
+        self.add_interpretation(before + [verb, prep2, c2] + after)
 
     def _6gram_c_v_c_to(self, _6gram, before, after):
         c1, sw1, v1, sw2, c2, sw_to = _6gram
@@ -673,18 +706,16 @@ class Interpreter():
 
 
     def add_interpretation(self, interpretation, recurse=True):
+        if len(self.interpretations) > 5000:
+            self.print_once("> 5000 interpretations")
+            return
         if interpretation not in self.interpretations:
             self.interpretations += [interpretation]
-            # for x in self.interpretations:
-            #     print x
-            # print '\n'
-            # import time
-            # time.sleep(4)
             if recurse:
                 self.interpret(interpretation)
 
     def remember(self, key, val):
-        self.thinker.computer_mind[key] = val
+        self.thinker.remember(val, key)
 
     def recall(self, key):
         return self.thinker.computer_mind.get(key, None)
@@ -700,7 +731,13 @@ class Interpreter():
     def print_once(self, string):
         self.one_item = string
         
-
+    def track_topic(self, parsed_sentence):
+        # Store Topic
+        if self.topic == None:
+            for item in parsed_sentence:
+                if isinstance(item, Concept):
+                    self.topic = item
+                    break
 
         # item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
         # for i, item_group in enumerate(item_groups):

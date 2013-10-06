@@ -68,3 +68,18 @@ class WordManager():
             return get_object_or_None(Concept, name=verb.participle_name)
         elif not verb.form:
             return get_object_or_None(Concept, name=verb.name)
+            
+
+    def adj_to_concept(self, adj):
+        return get_object_or_None(Concept, name=adj.name)
+
+    def get_shared_parent(self, items):
+        is_all_concepts = True
+        for item in items:
+            if not isinstance(item, Concept):
+                is_all_concepts = False
+        if is_all_concepts:
+            parent_set = set([x.parent for x in Category.objects.filter(child=items[0]).all()])
+            for item in items[1:]:
+                parent_set = set([x.parent for x in Category.objects.filter(child=item).all()]) & parent_set
+            return list(parent_set)

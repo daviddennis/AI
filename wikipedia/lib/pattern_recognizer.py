@@ -87,7 +87,7 @@ class PatternRecognizer():
                 else:
                     return False
                 continue
-            if arg.startswith("PREPOSITION"):
+            if arg in ("PREP", "PREPOSITION") or arg.startswith("PREP:"):
                 if isinstance(item, Preposition):
                     if ':' in arg:
                         if item.name != arg.split(':')[1]:
@@ -109,6 +109,15 @@ class PatternRecognizer():
                     return False
             if arg.startswith("VERBCONSTRUCT"):
                 if not isinstance(item, VerbConstruct):
+                    return False
+            if arg.startswith("CATEGORY"):
+                if not isinstance(item, Category):
+                    return False
+            if arg.startswith("GROUP"):
+                if not isinstance(item, Group):
+                    return False
+            if arg.startswith("CVERB"):
+                if not isinstance(item, ComplexVerb):
                     return False
             if arg == "...":
                 continue
