@@ -268,6 +268,23 @@ class PrepConstruct(models.Model):
                              self.concept2)
 
 
+class Property(models.Model):
+    parent = models.ForeignKey(Concept, related_name="prop_parent_set")
+
+    key_concept = models.ForeignKey(Concept, related_name="prop_key_set")
+
+    value_concept = models.ForeignKey(Concept, related_name="prop_value_set", null=True, blank=True)
+    value_amount = models.ForeignKey(Amount, related_name="prop_amount_set", null=True, blank=True)
+
+    def __unicode__(self):
+        if self.value_concept or self.value_amount:
+            return "%s-%s = %s" % (self.parent,
+                                   self.key_concept,
+                                   self.value_concept or self.value_amount)
+        else:
+            return "%s-%s" % (self.parent,
+                              self.key_concept)
+
 # class SentenceRecord
 
 # class Dialogue(models.Model):

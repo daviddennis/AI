@@ -37,6 +37,11 @@ class MediumThoughtProcessor():
                 self.trigram_cverb(trigram, before, after)
             if self.pr.recognize(trigram, "CATEGORY CVERB CONCEPT"):
                 self.trigram_ca_cverb_c(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY SW:is CONCEPT"):
+                self.trigram_property(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY SW:is AMOUNT"):
+                self.trigram_property_amount(trigram, before, after)
+
 
     def process_4grams(self, parsed_sentence):
         _4grams = [(w,x,y,z) for w,x,y,z in zip(parsed_sentence, 
@@ -50,6 +55,10 @@ class MediumThoughtProcessor():
                self._4gram_cverb(_4gram, before, after)
             if self.pr.recognize(_4gram, "CATEGORY PREP SW CONCEPT"):
                self._4gram_category_group(_4gram, before, after)
+            if self.pr.recognize(_4gram, "PROPERTY SW:is VERB:name CONCEPT"):
+               self._4gram_property(_4gram, before, after)
+            if self.pr.recognize(_4gram, "PROPERTY SW:is VERB:call CONCEPT"):
+               self._4gram_property(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CATEGORY SW:because ASSERTION"):
             #    print _4gram,'!!!!\n\n\n'
 
@@ -105,6 +114,18 @@ class MediumThoughtProcessor():
             concept2=concept)
         self.add_item(verb_construct)
 
+    def trigram_property(self, trigram, before, after):
+        prop, sw, c1 = trigram
+        prop.value_concept = c1
+        prop.save()
+        self.add_item(prop)
+
+    def trigram_property_amount(self, trigram, before, after):
+        prop, sw, amount = trigram
+        prop.value_amount = amount
+        prop.save()
+        self.add_item(prop)
+
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram
         verb_construct, created = VerbConstruct.objects.get_or_create(
@@ -126,6 +147,12 @@ class MediumThoughtProcessor():
                 child_concept=category.child)
             self.add_item(group_instance)
         
+    def _4gram_property(self, _4gram, before, after):
+        prop, sw, verb, c1 = _4gram
+        if not prop.value_concept:
+            prop.value_concept = c1
+            prop.save()
+            self.add_item(prop)
 
     def _5gram_group(self, _5gram, before, after):
         concept, sw, number, sws, group = _5gram

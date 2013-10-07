@@ -186,6 +186,8 @@ class ThoughtProcessor():
                 self.process_complex_verb_list(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT VERB PREP CONCEPT"):
                 self.process_basic_prep(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT PUNC:' SW:s CONCEPT"):
+                self.process_4gram_property(_4gram, before, after)
 
         if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
             self.process_if(parsed_sentence)
@@ -540,6 +542,14 @@ class ThoughtProcessor():
             complex_verb=complex_verb,
             concept2=c2)
         self.add_verb_construct(verb_construct)        
+
+    def process_4gram_property(self, _4gram, before, after):
+        c1, punc, s, c2 = _4gram
+        _property, created = Property.objects.get_or_create(
+            parent=c1,
+            key_concept=c2)
+        self.add_item(_property)
+        self.reinterpret(before + [_property] + after)
 
     def process_category_adj(self, parsed_sentence):
         c1, sws, adj, c2 = parsed_sentence

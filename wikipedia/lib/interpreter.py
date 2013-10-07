@@ -25,6 +25,8 @@ class Interpreter():
         self.thought_processor = None
         self.time_mgr = TimeManager()
 
+        self.user = get_object_or_None(Concept, name="DAVID DENNIS")
+
         self.one_item = None
 
     def interpret(self, parsed_sentence, last_transform=None, thinker=None):
@@ -58,6 +60,8 @@ class Interpreter():
             after = parsed_sentence[i+1:]
             if self.pr.recognize([unigram], "SW"):
                 self.unigram_prep(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:my"):
+                self.unigram_my(unigram, before, after)
             if self.pr.recognize([unigram], "SW:you"):
                 self.unigram_you(unigram, before, after)
             if self.pr.recognize([unigram], "SWS"):
@@ -86,6 +90,8 @@ class Interpreter():
                 self.unigram_was_a(unigram, before, after)
             if self.pr.recognize([unigram], "PUNC:,"):
                 self.unigram_comma(unigram, before, after)
+            if self.pr.recognize([unigram], "VERB"):
+                self.unigram_verb(unigram, before, after)
             #    self.unigram_on_then(unigram, before, after)
             
 
@@ -269,9 +275,15 @@ class Interpreter():
         comma = unigram
         self.add_interpretation(before + after)
 
-    def unigram_i(self, unigram, before, after):
-        david_dennis = get_object_or_None(Concept, name="DAVID DENNIS")
-        self.add_interpretation(before + [david_dennis] + after)
+    def unigram_verb(self, unigram, before, after):
+        verb = unigram
+        if verb.form == 'participle':
+            concept_or_none = get_object_or_None(Concept, name=verb.participle_name)
+            if concept_or_none:
+                self.add_interpretation(before + [concept_or_none] + after)
+
+    def unigram_i(self, unigram, before, after):        
+        self.add_interpretation(before + [self.user] + after)
 
     def unigram_concept(self, unigram, before, after):
         concept = unigram
@@ -292,6 +304,9 @@ class Interpreter():
                     self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
         if self.time_mgr.recognize_time(concept.name):
             self.add_interpretation(before + [Time(concept.name)] + after)
+        #verb_or_none = get_object_or_None(Verb, name=concept.name)
+        #if verb_or_none:
+        #    self.add_interpretation(before + [verb_or_none] + after)
 
     def unigram_exclude_word(self, unigram, before, after):
         self.add_interpretation(before + after)
@@ -309,6 +324,12 @@ class Interpreter():
         prep = get_object_or_None(Preposition, name=sw.name)
         if prep:
             self.add_interpretation(before + [prep] + after)
+
+    def unigram_my(self, unigram, before, after):
+        my = unigram
+        punc = Punctuation("'")
+        s = Stopword('S')
+        self.add_interpretation(before + [self.user, punc, s] + after)
 
     def unigram_you(self, unigram, before, after):
         category, created = Category.objects.get_or_create(

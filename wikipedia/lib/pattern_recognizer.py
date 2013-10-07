@@ -119,6 +119,9 @@ class PatternRecognizer():
             if arg.startswith("CVERB"):
                 if not isinstance(item, ComplexVerb):
                     return False
+            if arg.startswith("PROP"):
+                if not isinstance(item, Property):
+                    return False
             if arg == "...":
                 continue
         # if keep_looking:
