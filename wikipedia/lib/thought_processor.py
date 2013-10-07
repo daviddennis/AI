@@ -80,6 +80,8 @@ class ThoughtProcessor():
                 self.process_amount(item, before, after)
             if self.pr.recognize([item], "LIST"):
                 self.process_unigram_list(item, before, after)
+            if self.pr.recognize([item], "CATEGORY"):
+                self.process_unigram_category(item, before, after)
 
     def process_bigrams(self, parsed_sentence):
         bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
@@ -145,14 +147,14 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "VERB:list SW:all CONCEPT"):
                 result = self.process_list_concepts(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SW:am CONCEPT"):
+                result = self.process_am(item_group, before, after)
+                output += [result]
             if self.pr.recognize(item_group, "VERB:ask SW:a CONCEPT:question"):
                 result = self.process_ask_question(item_group, before, after)
                 output += [result]
             if self.pr.recognize(item_group, "LIST SWS:is_in_a CONCEPT"):
                 result = self.process_list_in(item_group, before, after)
-                output += [result]     
-            if self.pr.recognize(item_group, "LIST SW:are CONCEPT"):
-                result = self.process_list_are(item_group, before, after)
                 output += [result]     
             if self.pr.recognize(item_group, "VERB:show SWS:what_you CONCEPT:know"):
                 result = self.process_show_mind(item_group, before, after)
@@ -335,6 +337,10 @@ class ThoughtProcessor():
 
     def process_unigram_list(self, _list, before, after):
         self.remember(_list)
+
+    def process_unigram_category(self, category, before, after):
+        c1 = category.child
+        self.reinterpret(before + [c1] + after)
 
     def process_bigram_amount(self, bigram, before, after):
         number, concept = bigram
@@ -832,6 +838,16 @@ class ThoughtProcessor():
         print all_concepts
         return all_concepts
         
+    def process_am(self, trigram, before, after):
+        c1, sw, c2 = trigram
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            concept2=c2)
+        self.add_assertion(assertion)
+        self.reinterpret(before + [assertion] + after)
+
     def process_verb(self, triple, before, after):
         concept1, verb, concept2 = triple
         verb_construct, created = VerbConstruct.objects.get_or_create(

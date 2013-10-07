@@ -26,6 +26,7 @@ class Interpreter():
         self.time_mgr = TimeManager()
 
         self.user = get_object_or_None(Concept, name="DAVID DENNIS")
+        self.ai = get_object_or_None(Concept, name="AI")
 
         self.one_item = None
 
@@ -64,12 +65,16 @@ class Interpreter():
                 self.unigram_my(unigram, before, after)
             if self.pr.recognize([unigram], "SW:you"):
                 self.unigram_you(unigram, before, after)
+            if self.pr.recognize([unigram], "SWS:was_a"):
+                self.unigram_was_a(unigram, before, after)
+            if self.pr.recognize([unigram], "SWS:are_a"):
+                self.unigram_are_a(unigram, before, after)
+            if self.pr.recognize([unigram], "SWS:on_then"):
+                self.unigram_on_then(unigram, before, after)
             if self.pr.recognize([unigram], "SWS"):
                 self.unigram_sws(unigram, before, after)
             if self.pr.recognize([unigram], "SW:are"):
                 self.unigram_are(unigram, before, after)
-            if self.pr.recognize([unigram], "SWS:on_then"):
-                self.unigram_on_then(unigram, before, after)
             if self.pr.recognize([unigram], "SW:it"):
                 self.unigram_it(unigram, before, after)
             if self.pr.recognize([unigram], "SW:so"):
@@ -86,8 +91,6 @@ class Interpreter():
                 self.unigram_exclude_word(unigram, before, after)
             if self.pr.recognize([unigram], "SW:we"):
                 self.unigram_we(unigram, before, after)
-            if self.pr.recognize([unigram], "SWS:was_a"):
-                self.unigram_was_a(unigram, before, after)
             if self.pr.recognize([unigram], "PUNC:,"):
                 self.unigram_comma(unigram, before, after)
             if self.pr.recognize([unigram], "VERB"):
@@ -120,6 +123,8 @@ class Interpreter():
                 self.bigram_exclude(bigram, before, after)
             if self.pr.recognize(bigram, "VERB SW"):
                 self.bigram_verb_prep(bigram, before, after)
+            if self.pr.recognize(bigram, "SW:your CONCEPT"):
+                self.bigram_your(bigram, before, after)
             if self.pr.recognize(bigram, "SW CONCEPT"):
                 self.bigram_anaphoric_ref(bigram, before, after)
 
@@ -282,6 +287,11 @@ class Interpreter():
             if concept_or_none:
                 self.add_interpretation(before + [concept_or_none] + after)
 
+    def unigram_are_a(self, unigram, before, after):
+        sws = unigram
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        self.add_interpretation(before + [is_a] + after)
+
     def unigram_i(self, unigram, before, after):        
         self.add_interpretation(before + [self.user] + after)
 
@@ -412,6 +422,13 @@ class Interpreter():
         prep = get_object_or_None(Preposition, name=sw.name)
         if prep:
             self.add_interpretation(before + [verb, prep] + after)
+
+    def bigram_your(self, bigram, before, after):
+        sw, c1 = bigram
+        _property, created = Property.objects.get_or_create(
+            parent=self.ai,
+            key_concept=c1)
+        self.add_interpretation(before + [_property] + after)
 
     def bigram_anaphoric_ref(self, bigram, before, after):
         sw, concept = bigram
