@@ -17,9 +17,20 @@ class MediumThoughtProcessor():
         if thinker:
             self.thinker = thinker
 
+        self.process_bigrams(parsed_sentence)
         self.process_trigrams(parsed_sentence)
         self.process_4grams(parsed_sentence)
         self.process_5grams(parsed_sentence)
+
+    def process_bigrams(self, parsed_sentence):
+        bigrams = [(x,y) for x,y in zip(parsed_sentence,
+                                         parsed_sentence[1:])]
+
+        for i, bigram in enumerate(bigrams):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+2:]
+            if self.pr.recognize(bigram, "PROPERTY AMOUNT"):
+                self.bigram_prop_amt(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence,
@@ -35,11 +46,15 @@ class MediumThoughtProcessor():
                 self.trigram_ca_ass_group(trigram, before, after)
             if self.pr.recognize(trigram, "AMOUNT CVERB CONCEPT"):
                 self.trigram_cverb(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT CVERB AMOUNT"):
+                self.trigram_cverb_ca(trigram, before, after)
             if self.pr.recognize(trigram, "CATEGORY CVERB CONCEPT"):
                 self.trigram_ca_cverb_c(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY SW:is CONCEPT"):
                 self.trigram_property(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY SW:is AMOUNT"):
+                self.trigram_property_amount(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY SW:of AMOUNT"):
                 self.trigram_property_amount(trigram, before, after)
 
 
@@ -75,6 +90,12 @@ class MediumThoughtProcessor():
             if self.pr.recognize(_5gram, "CONCEPT SW NUMBER SWS GROUP"):
                 self._5gram_group(_5gram, before, after)
 
+
+    def bigram_prop_amt(self, bigram, before, after):
+        prop, amount = bigram
+        prop.value_amount = amount
+        prop.save()
+        self.add_item(prop)
 
     def trigram_group(self, trigram, before, after):
         c1, sws, group = trigram
@@ -112,6 +133,14 @@ class MediumThoughtProcessor():
             concept1=category.child,
             complex_verb=cverb,
             concept2=concept)
+        self.add_item(verb_construct)
+
+    def trigram_cverb_ca(self, trigram, before, after):
+        concept, cverb, amount = trigram
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=concept,
+            complex_verb=cverb,
+            amount2=amount)
         self.add_item(verb_construct)
 
     def trigram_property(self, trigram, before, after):

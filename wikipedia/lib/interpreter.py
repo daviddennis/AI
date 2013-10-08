@@ -33,8 +33,10 @@ class Interpreter():
     def interpret(self, parsed_sentence, last_transform=None, thinker=None):
         if thinker:
             self.thinker = thinker
-        #print parsed_sentence
-        self.add_interpretation(parsed_sentence)
+
+        if parsed_sentence not in self.interpretations:
+            self.interpretations += [parsed_sentence]
+            #self.add_interpretation(parsed_sentence)
 
         if self.pr.recognize(parsed_sentence, "SW:if ... ... ... SW:then ... ... ..."):
             self.ngram_if(parsed_sentence)
@@ -117,6 +119,8 @@ class Interpreter():
                 self.bigram_recall(bigram, before, after)
             if self.pr.recognize(bigram, "NUMBER CONCEPT"):
                 self.bigram_amount_or_time(bigram, before, after)
+            if self.pr.recognize(bigram, "SW:are SW:a"):
+                self.bigram_are_a(bigram, before, after)
             if self.pr.recognize(bigram, "SW SW"):
                 self.bigram_sw(bigram, before, after)
             if self.pr.recognize(bigram, "SW:the CONCEPT:way"):
@@ -165,6 +169,11 @@ class Interpreter():
                 self.trigram_will_be(trigram, before, after)                
             if self.pr.recognize(trigram, "SWS:was_a TIME CONCEPT"):
                 self.trigram_time(trigram, before, after)                
+            if self.pr.recognize(trigram, "VERB SW:and VERB"):
+                self.trigram_v_and_v(trigram, before, after)
+            if self.pr.recognize(trigram, "ADJECTIVE SW:or ADJECTIVE"):
+                self.trigram_adj_and_adj(trigram, before, after)
+
 
     def interpret_4grams(self, parsed_sentence):
         _4grams = [(w,x,y,z) for w,x,y,z in zip(parsed_sentence, 
@@ -400,6 +409,11 @@ class Interpreter():
         if item:
             self.add_interpretation(before + [item] + after)
 
+    def bigram_are_a(self, bigram, before, after):
+        sw_are, sw_a = bigram
+        is_a = get_object_or_None(StopwordSequence, string="is a".upper())
+        self.add_interpretation(before + [is_a] + after)        
+
     def bigram_amount_or_time(self, bigram, before, after):
         number, concept = tuple(bigram)
 
@@ -515,6 +529,16 @@ class Interpreter():
         sws, time, concept = trigram
         concept.time_keyword = time.name
         self.add_interpretation(before + [sws, concept] + after)
+
+    def trigram_v_and_v(self, trigram, before, after):
+        v1, sw_and, v2 = trigram
+        self.add_interpretation(before + [v1] + after)
+        self.add_interpretation(before + [v2] + after)
+
+    def trigram_adj_and_adj(self, trigram, before, after):
+        adj1, sw_or, adj2 = trigram
+        self.add_interpretation(before + [adj1] + after)
+        self.add_interpretation(before + [adj2] + after)
 
     def _4gram_file(self, _4gram, before, after):
         file_concept, file_name_concept, punc, csv = tuple(_4gram)
@@ -747,10 +771,10 @@ class Interpreter():
         if len(self.interpretations) > 5000:
             self.print_once("> 5000 interpretations")
             return
-        if interpretation not in self.interpretations:
-            self.interpretations += [interpretation]
-            if recurse:
-                self.interpret(interpretation)
+        #if interpretation not in self.interpretations:
+        #    self.interpretations += [interpretation]
+        if recurse:
+            self.interpret(interpretation)
 
     def remember(self, key, val):
         self.thinker.remember(val, key)

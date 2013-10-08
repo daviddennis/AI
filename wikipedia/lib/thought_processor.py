@@ -125,6 +125,8 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT SW:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(item_group, "NUMBER CONCEPT CONCEPT"):
+                self.process_trigram_number_cc(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:of_the CONCEPT"):
                 self.process_of_the(item_group, before, after)
             if self.pr.recognize(item_group, 'VERB:switch CONCEPT:context CONCEPT'):
@@ -190,6 +192,10 @@ class ThoughtProcessor():
                 self.process_basic_prep(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT PUNC:' SW:s CONCEPT"):
                 self.process_4gram_property(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT VERB:had SW:a CONCEPT"):
+                self.process_4gram_property_had(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT VERB:had SW:an CONCEPT"):
+                self.process_4gram_property_had(_4gram, before, after)
 
         if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
             self.process_if(parsed_sentence)
@@ -371,7 +377,8 @@ class ThoughtProcessor():
         verb, prep = bigram
         complex_verb, created = ComplexVerb.objects.get_or_create(
             verb=verb,
-            preposition=prep)
+            preposition=prep,
+            prep2=None)
         self.add_item(complex_verb)
         self.reinterpret(before + [complex_verb] + after)
 
@@ -422,7 +429,7 @@ class ThoughtProcessor():
         self.remember('LIST OF %s' % category_concept.name, _list)
 
     def process_range(self, parsed_sentence):
-        concept1, sws1, adj, concept2, sws2, concept3 = tuple(parsed_sentence)
+        concept1, sws1, adj, concept2, sws2, concept3 = tuple(parsed_sentence[:6])
         category, created = Category.objects.get_or_create(parent=concept2,
                                                            child=concept1)
         self.add_category(category)
@@ -541,7 +548,8 @@ class ThoughtProcessor():
         c1, verb, prep, c2 = _4gram
         complex_verb, created = ComplexVerb.objects.get_or_create(
             verb=verb,
-            preposition=prep)
+            preposition=prep,
+            prep2=None)
         self.add_item(complex_verb)
         verb_construct, created = VerbConstruct.objects.get_or_create(
             concept1=c1,
@@ -551,6 +559,14 @@ class ThoughtProcessor():
 
     def process_4gram_property(self, _4gram, before, after):
         c1, punc, s, c2 = _4gram
+        _property, created = Property.objects.get_or_create(
+            parent=c1,
+            key_concept=c2)
+        self.add_item(_property)
+        self.reinterpret(before + [_property] + after)
+
+    def process_4gram_property_had(self, _4gram, before, after):
+        c1, verb, sw, c2 = _4gram
         _property, created = Property.objects.get_or_create(
             parent=c1,
             key_concept=c2)
@@ -781,6 +797,15 @@ class ThoughtProcessor():
             child_concept=concept1)
         self.add_group(group)
         self.reinterpret(before + [group] + after)
+
+    def process_trigram_number_cc(self, trigram, before, after):
+        number, c1, c2 = trigram
+        amount, created = Amount.objects.get_or_create(
+            number=number.number,
+            unit=c1,
+            concept=c2)
+        self.add_item(amount)
+        self.reinterpret(before + [amount] + after)
 
     def process_is_a(self, triple, before, after):
         concept1, stopword, concept2 = triple

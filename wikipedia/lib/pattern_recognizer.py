@@ -30,7 +30,7 @@ class PatternRecognizer():
             if arg == "VERB" or arg.startswith("VERB:"):
                 if isinstance(item, Verb):
                     if ':' in arg:
-                        if item.name != arg.split(':')[1]:
+                        if item.name != arg.split(':')[1] and item.past_name != arg.split(':')[1]:
                             return False
                 else:
                     return False
