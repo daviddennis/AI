@@ -122,6 +122,9 @@ class PatternRecognizer():
             if arg.startswith("PROP"):
                 if not isinstance(item, Property):
                     return False
+            if arg.startswith("NAME"):
+                if not isinstance(item, PersonName):
+                    return False
             if arg == "...":
                 continue
         # if keep_looking:

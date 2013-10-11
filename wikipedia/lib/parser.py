@@ -1,14 +1,12 @@
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import stopwords
 from annoying.functions import get_object_or_None
-from wikipedia.models import (Concept, Connection, StopwordSequence, 
-                              Stopword, Punctuation, Verb, Number,
-                              Adjective)
+from wikipedia.models import *
 import string
 import sys
 
-stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')])
-
+stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')] \
+                     + [x.upper() for x in ('mine')])
 
 class Parser():
 
@@ -64,20 +62,25 @@ class Parser():
                                 before += [items[0]]
                                 remaining = items[1:]
                             else:
-                                items, success = self.parse_adjective(item)
+                                items, success = self.parse_name(item)
                                 if success:
                                     before += [items[0]]
                                     remaining = items[1:]
-                                else:                    
+                                else:
                                     items, success = self.parse_concept(item)
                                     if success:
                                         before += [items[0]]
                                         remaining = items[1:]
                                     else:
-                                        subitems = self.tokenize(items[0])
-                                        before += [subitems[0]]
-                                        remaining += [' '.join(subitems[1:])]
-            
+                                        items, success = self.parse_adjective(item)
+                                        if success:
+                                            before += [items[0]]
+                                            remaining = items[1:]
+                                        else:
+                                            subitems = self.tokenize(items[0])
+                                            before += [subitems[0]]
+                                            remaining += [' '.join(subitems[1:])]
+
             if remaining == ['']:
                 latest = before
                 break
@@ -158,13 +161,23 @@ class Parser():
             return ([Number(number_token)] + [' '.join(tokens[1:])], True)
         else:
             return ([item], False)
-            
+
+    def parse_name(self, item):
+        tokens = self.tokenize(item)
+        name = get_object_or_None(PersonName, name=tokens[0])
+        if name and name.rank:
+            return ([name] + [' '.join(tokens[1:])], True)
+        else:
+            return ([item], False)
 
     def parse_adjective(self, item):
         tokens = self.tokenize(item)        
         adjective = get_object_or_None(Adjective, superlative=tokens[0])
         if adjective:
             adjective.form = 'superlative'
+        else:
+            adjective = get_object_or_None(Adjective, name=tokens[0])
+        if adjective:
             return ([adjective] + [' '.join(tokens[1:])], True)
         else:
             return ([item], False)

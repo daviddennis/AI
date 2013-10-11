@@ -5,11 +5,10 @@ from wikipedia.lib.group_manager import GroupManager
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.lib.time_mgr import TimeManager
 from wikipedia.models import *
+from django.core.exceptions import MultipleObjectsReturned
 import operator
 import sys
 from annoying.functions import get_object_or_None
-
-group_stopword_seqs = set([x.upper() for x in ["on the", "in the"]])
 
 class Interpreter():
 
@@ -52,7 +51,7 @@ class Interpreter():
         self.interpret_5grams(parsed_sentence)
         self.interpret_6grams(parsed_sentence)
         self.interpret_7grams(parsed_sentence)
-
+        
         self.track_topic(parsed_sentence)
 
         return self.interpretations #self.return_interpretations()
@@ -61,6 +60,12 @@ class Interpreter():
         for i, unigram in enumerate(parsed_sentence):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+1:]
+            if self.pr.recognize([unigram], "SW:am"):
+                self.unigram_am(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:an"):
+                self.unigram_an(unigram, before, after)
+            if self.pr.recognize([unigram], "SW"):
+                self.unigram_quantifier(unigram, before, after)
             if self.pr.recognize([unigram], "SW"):
                 self.unigram_prep(unigram, before, after)
             if self.pr.recognize([unigram], "SW:my"):
@@ -105,6 +110,8 @@ class Interpreter():
         for i, bigram in enumerate(bigrams):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+2:]
+            if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
+                self.bigram_adj_c(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT:type SW:of"):
                 self.bigram_type_of(bigram, before, after)
             if self.pr.recognize(bigram, "SW:the CONCEPT"):
@@ -217,8 +224,8 @@ class Interpreter():
                 self._5gram_and(_5gram, before, after)
             if self.pr.recognize(_5gram, "CONCEPT SW:are VERB SW:by CONCEPT"):
                 self._5gram_by(_5gram, before, after)
-            if self.pr.recognize(_5gram, "VERB PREP CONCEPT PREP CONCEPT"):
-                self._5gram_break_complex_verb(_5gram, before, after)
+            #if self.pr.recognize(_5gram, "VERB PREP CONCEPT PREP CONCEPT"):  ### spoke on island of corsica - not working
+            #    self._5gram_break_complex_verb(_5gram, before, after)
 
 
     def interpret_6grams(self, parsed_sentence):
@@ -306,7 +313,7 @@ class Interpreter():
 
     def unigram_concept(self, unigram, before, after):
         concept = unigram
-        if 'OF' in concept.name:
+        if ' OF ' in concept.name:
             concept_name1, concept_name2 = concept.name.split(' OF ')
             if concept_name1 not in ('THE') and concept_name2 not in ('THE'):
                 concept1 = get_object_or_None(Concept, name=concept_name1)
@@ -323,6 +330,13 @@ class Interpreter():
                     self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
         if self.time_mgr.recognize_time(concept.name):
             self.add_interpretation(before + [Time(concept.name)] + after)
+        try:
+            name_or_none = get_object_or_None(PersonName, name=concept.name)
+        except MultipleObjectsReturned:
+            PersonName.objects.filter(name=concept.name).all().delete()
+            name_or_none, created = PersonName.objects.get_or_create(name=concept.name)
+        if name_or_none:
+            self.add_interpretation(before + [name_or_none] + after)
         #verb_or_none = get_object_or_None(Verb, name=concept.name)
         #if verb_or_none:
         #    self.add_interpretation(before + [verb_or_none] + after)
@@ -338,11 +352,26 @@ class Interpreter():
         is_a = get_object_or_None(StopwordSequence, string="is a".upper())
         self.add_interpretation(before + [is_a] + after)
 
+    def unigram_am(self, unigram, before, after):
+        sw_am = unigram
+        sw_is = Stopword("IS")
+        self.add_interpretation(before + [sw_is] + after)
+
+    def unigram_an(self, unigram, before, after):
+        sw_an = unigram
+        sw_a = Stopword("A")
+        self.add_interpretation(before + [sw_a] + after)
+
     def unigram_prep(self, unigram, before, after):
         sw = unigram
         prep = get_object_or_None(Preposition, name=sw.name)
         if prep:
             self.add_interpretation(before + [prep] + after)
+
+    def unigram_quantifier(self, sw, before, after):
+        quantifier = get_object_or_None(Quantifier, name=sw.name)
+        if quantifier:
+            self.add_interpretation(before + [quantifier] + after)
 
     def unigram_my(self, unigram, before, after):
         my = unigram
@@ -374,6 +403,12 @@ class Interpreter():
                 concept.hit += 1
                 concept_as_the.hit += 1
                 self.add_interpretation(before + [concept_as_the] + after)
+
+    def bigram_adj_c(self, bigram, before, after):
+        c1, c2 = bigram
+        adj = self.word_mgr.concept_to_adj(c1)
+        if adj:
+            self.add_interpretation(before + [adj, c2] + after)
 
     def bigram_type_of(self, bigram, before, after):
         c1, sw = bigram

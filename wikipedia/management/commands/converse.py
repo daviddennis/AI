@@ -74,18 +74,9 @@ class Command(BaseCommand):
                 print '----'*5 + ' FIRST LEVEL'
             thoughts = []
             for interpretation in interpretations:
-                #print interpretation
-                if query_mgr.is_query(interpretation):
-                    print ':Query'
-                    query = query_mgr.construct_query(interpretation)
-                    answer = query_mgr.process_query(query)
-                    answer_sentence = nlp_generator.deparse(answer)
-                    print '\n:: %s\n' % (answer_sentence)
-                else:
-                    #print ':Instruction'
-                    thought_processor.process_thought(interpretation, thinker=self)
-                    thoughts += thought_processor.get_interpretations()
-                    thought_processor.clear_interpretations()
+                thought_processor.process_thought(interpretation, thinker=self)
+                thoughts += thought_processor.get_interpretations()
+                thought_processor.clear_interpretations()
 
             for key, val in thought_processor.learned.iteritems():
                 print key,':',val
@@ -110,6 +101,18 @@ class Command(BaseCommand):
                 
         print '\nGoodbye.\n'
         return
+
+
+    #print interpretation
+    # if query_mgr.is_query(interpretation):
+    #     print ':Query'
+    #     query = query_mgr.construct_query(interpretation)
+    #     answer = query_mgr.process_query(query)
+    #     answer_sentence = nlp_generator.deparse(answer)
+    #     print '\n:: %s\n' % (answer_sentence)
+    # else:
+    #print ':Instruction'
+
 
     def remember(self, item, key=None):
         if len(self.computer_mind) > 30:

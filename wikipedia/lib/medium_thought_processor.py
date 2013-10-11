@@ -44,6 +44,8 @@ class MediumThoughtProcessor():
                 self.trigram_group(trigram, before, after)
             if self.pr.recognize(trigram, "CATEGORY SW:because ASSERTION"):
                 self.trigram_ca_ass_group(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY SW:in CONCEPT"):
+                self.trigram_ca_in_c(trigram, before, after)
             if self.pr.recognize(trigram, "AMOUNT CVERB CONCEPT"):
                 self.trigram_cverb(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT CVERB AMOUNT"):
@@ -56,6 +58,8 @@ class MediumThoughtProcessor():
                 self.trigram_property_amount(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY SW:of AMOUNT"):
                 self.trigram_property_amount(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:is PROPERTY"):
+                self.trigram_c_is_property(trigram, before, after)
 
 
     def process_4grams(self, parsed_sentence):
@@ -119,6 +123,19 @@ class MediumThoughtProcessor():
         #         assertion1=assertion,
         #         )
 
+    def trigram_ca_in_c(self, trigram, before, after):
+        category, sw_in, c2 = trigram
+        c1_type = category.parent
+        c1 = category.child
+        groups = Group.objects.filter(parent_concept=c2, child_concept=c1_type).all()
+        if groups:
+            group = groups[0]
+            group_instance, created = GroupInstance.objects.get_or_create(
+                group=group,
+                parent_concept=c2,
+                child_concept=c1)
+            self.add_item(group_instance)
+
     def trigram_cverb(self, trigram, before, after):
         amount, cverb, concept = trigram
         verb_construct, created = VerbConstruct.objects.get_or_create(
@@ -152,6 +169,12 @@ class MediumThoughtProcessor():
     def trigram_property_amount(self, trigram, before, after):
         prop, sw, amount = trigram
         prop.value_amount = amount
+        prop.save()
+        self.add_item(prop)
+
+    def trigram_c_is_property(self, trigram, before, after):
+        c1, sw_is, prop = trigram
+        prop.value_concept = c1
         prop.save()
         self.add_item(prop)
 

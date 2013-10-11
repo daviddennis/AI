@@ -88,6 +88,8 @@ class ThoughtProcessor():
         for i, bigram in enumerate(bigrams):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+2:]
+            if self.pr.recognize(bigram, "NAME NAME"):
+                self.process_bigram_names(bigram, before, after)
             if self.pr.recognize(bigram, "NUMBER CONCEPT"):
                 self.process_bigram_amount(bigram, before, after)
             if self.pr.recognize(bigram, "SW VERBCONSTRUCT"):
@@ -96,6 +98,8 @@ class ThoughtProcessor():
                 self.process_bigram_complex_verb(bigram, before, after)
             if self.pr.recognize(bigram, "AMOUNT CONCEPT"):
                 self.process_bigram_amount_unit(bigram, before, after)
+            if self.pr.recognize(bigram, "ADJECTIVE CONCEPT"):
+                self.process_bigram_adj_c(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         output = []
@@ -125,6 +129,16 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT SW:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SWS:is_not_a CONCEPT"):
+                self.process_trigram_c_isnota_c(item_group, before, after)
+            if self.pr.recognize(item_group, "CONCEPT SWS:is_a ASSERTION"):
+                self.process_trigram_c_isa_ass(item_group, before, after)
+            if self.pr.recognize(item_group, "VERB SW:the CONCEPT"):
+                self.process_trigram_v_the_c(item_group, before, after)
+            if self.pr.recognize(item_group, "CONCEPT SW:to VERB"):
+                self.process_trigram_c_to_v(item_group, before, after)
+            if self.pr.recognize(item_group, "CONCEPT PREP:of CONCEPT"):
+                self.process_trigram_property_of(item_group, before, after)
             if self.pr.recognize(item_group, "NUMBER CONCEPT CONCEPT"):
                 self.process_trigram_number_cc(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:of_the CONCEPT"):
@@ -196,6 +210,9 @@ class ThoughtProcessor():
                 self.process_4gram_property_had(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT VERB:had SW:an CONCEPT"):
                 self.process_4gram_property_had(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SW:or CONCEPT SWS:is_a"):
+                self.process_4gram_alias(_4gram, before, after)
+
 
         if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
             self.process_if(parsed_sentence)
@@ -348,6 +365,17 @@ class ThoughtProcessor():
         c1 = category.child
         self.reinterpret(before + [c1] + after)
 
+    def process_bigram_names(self, bigram, before, after):
+        n1, n2 = bigram
+        print n1.rank, n2.rank
+        if not n1.rank or not n2.rank:
+            return
+        entity, created = Entity.objects.get_or_create(
+            first_name=n1.name,
+            last_name=n2.name)
+        self.add_item(entity)
+        self.reinterpret(before + [entity] + after)
+
     def process_bigram_amount(self, bigram, before, after):
         number, concept = bigram
         amount, created = Amount.objects.get_or_create(
@@ -364,6 +392,16 @@ class ThoughtProcessor():
                     unit=amount.concept,
                     concept=c1)
                 self.reinterpret(before + [new_amount] + after)
+
+    def process_bigram_adj_c(self, bigram, before, after):
+        adj, c1 = bigram
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            adj2=adj)
+        self.add_item(assertion)
+        self.reinterpret(before + [assertion] + after)
 
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
@@ -463,6 +501,15 @@ class ThoughtProcessor():
         self.add_category(category)
         self.reinterpret(before + [category] + after)
 
+    def process_4gram_alias(self, _4gram, before, after):
+        c1, sw_or, c2, sws_isa = _4gram
+        alias, created = Alias.objects.get_or_create(
+            concept1=c1,
+            concept2=c2)
+        self.add_item(alias)
+        self.reinterpret(before + [c1, sws_isa] + after)
+        self.reinterpret(before + [c2, sws_isa] + after)
+
     def process_apostrophe(self, parsed_sentence):
         concept1, punc, sw, concept2 = tuple(parsed_sentence[:4])
         relation = get_object_or_None(Relation, name="HasProperty")
@@ -551,11 +598,13 @@ class ThoughtProcessor():
             preposition=prep,
             prep2=None)
         self.add_item(complex_verb)
+        self.reinterpret(before + [c1, complex_verb, c2] + after)
         verb_construct, created = VerbConstruct.objects.get_or_create(
             concept1=c1,
             complex_verb=complex_verb,
             concept2=c2)
-        self.add_verb_construct(verb_construct)        
+        self.add_verb_construct(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def process_4gram_property(self, _4gram, before, after):
         c1, punc, s, c2 = _4gram
@@ -564,6 +613,7 @@ class ThoughtProcessor():
             key_concept=c2)
         self.add_item(_property)
         self.reinterpret(before + [_property] + after)
+        self.reinterpret(before + [c2] + after)
 
     def process_4gram_property_had(self, _4gram, before, after):
         c1, verb, sw, c2 = _4gram
@@ -806,6 +856,57 @@ class ThoughtProcessor():
             concept=c2)
         self.add_item(amount)
         self.reinterpret(before + [amount] + after)
+
+    def process_trigram_c_to_v(self, item_group, before, after):
+        c1, sw_to, v = item_group
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=v,
+            concept2=None)
+        self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
+
+    def process_trigram_v_the_c(self, item_group, before, after):
+        verb, sw_the, c2 = item_group
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=None,
+            verb=verb,
+            concept2=c2)
+        self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)        
+
+    def process_trigram_c_isa_ass(self, item_group, before, after):
+        c1, sws_isa, ass1 = item_group
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            concept2=None,
+            adj2=None)
+        if ass1.concept2:
+            assertion.concept2 = ass1.concept2
+        elif ass1.adj2:
+            assertion.adj2 = ass1.adj2
+        self.add_item(assertion)
+        self.reinterpret(before + [c1, sws_isa, ass1.concept1] + after)
+
+    def process_trigram_c_isnota_c(self, item_group, before, after):
+        c1, isnota, c2 = item_group
+        relation = get_object_or_None(Relation, name="IsNotA")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            concept2=c2)
+        self.add_assertion(assertion)
+
+    def process_trigram_property_of(self, item_group, before, after):
+        c1, sw_of, c2 = item_group
+        _property, created = Property.objects.get_or_create(
+            parent=c2,
+            key_concept=c1)
+        self.add_item(_property)
+        self.reinterpret(before + [_property] + after)
+        self.reinterpret(before + [c2] + after)
 
     def process_is_a(self, triple, before, after):
         concept1, stopword, concept2 = triple

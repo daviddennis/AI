@@ -57,6 +57,7 @@ class PersonName(models.Model):
     male_pct = models.FloatField(null=True, blank=True)
     female_pct = models.FloatField(null=True, blank=True)
     first_pct = models.FloatField(null=True, blank=True)
+    last_pct = models.FloatField(null=True, blank=True)
 
     def __unicode__(self):
         return self.name
@@ -132,7 +133,7 @@ class Assertion(models.Model):
 
     relation = models.ForeignKey(Relation)
 
-    concept2 = models.ForeignKey(Concept, related_name="assertion_2_set")
+    concept2 = models.ForeignKey(Concept, related_name="assertion_2_set", null=True, blank=True)
     adj2 = models.ForeignKey(Adjective, related_name="adj_2_set", null=True, blank=True)
 
     score = models.IntegerField(null=True, blank=True)
@@ -140,14 +141,16 @@ class Assertion(models.Model):
     context = models.ForeignKey(Context, related_name="assertion_context_set", null=True, blank=True)
     
     def __unicode__(self):
-        orig = "%s %s %s" % (self.concept1, self.relation, self.concept2)
+        orig = "%s %s %s" % (self.concept1, self.relation, (self.concept2 or self.adj2))
         if self.context:
             orig += " in the context of %s" % self.context.concept.name
         return orig
 
 # NL Structure
 class Amount(models.Model):
-    number = models.FloatField()
+    quantifier = models.ForeignKey('Quantifier', related_name="quant_set", null=True, blank=True)
+
+    number = models.FloatField(null=True, blank=True)
     concept = models.ForeignKey(Concept, related_name="amount_set")
     unit = models.ForeignKey(Concept, related_name="unit_set", null=True, blank=True)
 
@@ -285,7 +288,26 @@ class Property(models.Model):
             return "%s-%s" % (self.parent,
                               self.key_concept)
 
-# class SentenceRecord
+class Entity(models.Model):
+    first_name = models.CharField(max_length=100, null=True, blank=True)
+    last_name = models.CharField(max_length=100, null=True, blank=True)
+
+    concept = models.ForeignKey(Concept, related_name="entity_set", null=True, blank=True)
+
+    def __unicode__(self):
+        if self.concept:
+            return self.concept.name
+        else:
+            return "%s %s" % (self.first_name, self.last_name)
+
+
+class Quantifier(models.Model):
+    name = models.CharField(max_length=20)
+    
+    def __unicode__(self):
+        return self.name
+
+# Class SentenceRecord
 
 # class Dialogue(models.Model):
 #     sentence = models.CharField(max_length=2000)

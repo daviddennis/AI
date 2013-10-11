@@ -34,11 +34,15 @@ class QueryManager():
             'parsed_sentence': latest
             }
         first_item = latest[0]
-        if isinstance(first_item, StopwordSequence) or isinstance(first_item, Stopword):
-
+        if isinstance(first_item, StopwordSequence):
             for w_word in self.w_words:
                 if w_word in first_item.string:
+                    query['type'] = w_word 
+        elif isinstance(first_item, Stopword):
+            for w_word in self.w_words:
+                if w_word in first_item.name:
                     query['type'] = w_word
+
         return query
 
     def process_query(self, query):
@@ -105,28 +109,30 @@ class QueryManager():
             if isinstance(item, Concept):
                 concept_to_define = item
 
-        assertions = Assertion.objects.filter(
-            concept1=concept_to_define, 
-            relation__name="IsA").\
-            order_by('-score').\
-            all()
+        # assertions = Assertion.objects.filter(
+        #     concept1=concept_to_define, 
+        #     relation__name="IsA").\
+        #     order_by('-score').\
+        #     all()
+
+        assertions = None
 
         answer = {
             'type': 'definition'
             }
-        if assertions:
-            answer['sentence'] = [assertions[0]]
-        else:
-            print 'Loading en...'
-            import en
-            concept_name_singular = en.noun.singular(concept_to_define.name)
-            assertions = Assertion.objects.filter(
-                concept1__name=concept_name_singular, 
-                relation__name="IsA").order_by('-score').all()
+        # if assertions:
+        #     answer['sentence'] = [assertions[0]]
+        # else:
+        # print 'Loading en...'
+        # import en
+        # concept_name_singular = en.noun.singular(concept_to_define.name)
+        # assertions = Assertion.objects.filter(
+        #     concept1__name=concept_name_singular, 
+        #     relation__name="IsA").order_by('-score').all()
                 
-            if assertions:
-                answer['sentence'] = [assertions[0]]        
-            else:
-                answer['sentence'] = ['i', "do", "not", "know"]
+        if assertions:
+            answer['sentence'] = [assertions[0]]        
+        else:
+            answer['sentence'] = ['i', "do", "not", "know"]
             
         return answer

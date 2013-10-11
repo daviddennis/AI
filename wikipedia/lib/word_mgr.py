@@ -70,8 +70,17 @@ class WordManager():
             return get_object_or_None(Concept, name=verb.name)
             
 
+    def concept_to_adj(self, concept):
+        adj = get_object_or_None(Adjective, name=concept.name)
+        if not adj:
+            adj = get_object_or_None(Adjective, superlative=concept.name)
+        return adj
+
     def adj_to_concept(self, adj):
-        return get_object_or_None(Concept, name=adj.name)
+        concept = get_object_or_None(Concept, name=adj.name)
+        if not concept:
+            concept = get_object_or_None(Concept, name=adj.superlative)
+        return concept
 
     def get_shared_parent(self, items):
         is_all_concepts = True
