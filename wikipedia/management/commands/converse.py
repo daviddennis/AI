@@ -8,6 +8,7 @@ from wikipedia.lib.causation import CausationManager
 from wikipedia.lib.thought_processor import ThoughtProcessor
 from wikipedia.lib.medium_thought_processor import MediumThoughtProcessor
 from wikipedia.lib.word_mgr import WordManager
+from wikipedia.lib.question_asker import QuestionAsker
 from sys import stdout
 from time import sleep
 import sys
@@ -28,8 +29,18 @@ class Command(BaseCommand):
         causation = CausationManager()
         thought_processor = ThoughtProcessor()
         medium_thought_processor = MediumThoughtProcessor()
+        question_asker = QuestionAsker()
+
+        nlp_generator.parser = interpreter.parser
+        nlp_generator.word_mgr = self.word_mgr
         interpreter.thought_processor = thought_processor
         interpreter.causation = causation
+        question_asker.nlp_generator = nlp_generator
+        question_asker.word_mgr = self.word_mgr
+        question_asker.query_mgr = query_mgr
+
+        learned_items = set()
+        prev_question = None
 
         if 'verbs' in args:
             print 'Loading en...'
@@ -80,6 +91,8 @@ class Command(BaseCommand):
 
             for key, val in thought_processor.learned.iteritems():
                 print key,':',val
+            print thought_processor.learned.values()
+            learned_items |= set([x for y in thought_processor.learned.values() for x in y])
             thought_processor.learned = {}
 
             if thoughts:
@@ -93,7 +106,26 @@ class Command(BaseCommand):
                 print '----'*5
                 for key, val in medium_thought_processor.learned.iteritems():
                     print key,':',val
+                learned_items |= set([x for y in thought_processor.learned.values() for x in y])
                 medium_thought_processor.learned = {}
+
+            print '\n\n'
+
+            #print learned_items
+
+            # Answer Question
+            if prev_question:
+                question_asker.answer_question(question=prev_question, items=learned_items)
+                prev_question = None
+
+            # Ask Question
+            prev_question = question_asker.ask_question(items=learned_items)
+            if prev_question:
+                for item in prev_question.get('logical_path', []):
+                    print item
+                print prev_question.get('nlp_sentence')
+
+            learned_items = set()
 
             print '\n\n'
 

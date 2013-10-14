@@ -60,6 +60,8 @@ class MediumThoughtProcessor():
                 self.trigram_property_amount(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:is PROPERTY"):
                 self.trigram_c_is_property(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY VERB:had AMOUNT"):
+                self.trigram_p_v_amount(trigram, before, after)
 
 
     def process_4grams(self, parsed_sentence):
@@ -78,6 +80,10 @@ class MediumThoughtProcessor():
                self._4gram_property(_4gram, before, after)
             if self.pr.recognize(_4gram, "PROPERTY SW:is VERB:call CONCEPT"):
                self._4gram_property(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SW:was CVERB NUMBER"):
+               self._4gram_date(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT CVERB SW:the CONCEPT"):
+               self._4gram_cvc(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CATEGORY SW:because ASSERTION"):
             #    print _4gram,'!!!!\n\n\n'
 
@@ -178,6 +184,12 @@ class MediumThoughtProcessor():
         prop.save()
         self.add_item(prop)
 
+    def trigram_p_v_amount(self, trigram, before, after):
+        p, verb_has, amount = trigram
+        p.value_amount = amount
+        p.save()
+        self.add_item(p)
+
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram
         verb_construct, created = VerbConstruct.objects.get_or_create(
@@ -205,6 +217,27 @@ class MediumThoughtProcessor():
             prop.value_concept = c1
             prop.save()
             self.add_item(prop)
+
+    def _4gram_date(self, _4gram, before, after):
+        c1, sw_was, cverb, number = _4gram
+        time_name = str(number.number)
+        if cverb.preposition.name == "IN":
+            time_name = str(int(number.number))
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=cverb.verb,
+            concept2=None,
+            time=time_name)
+        self.add_item(verb_construct)
+        #self.reinterpret(before + [verb_construct] + after)
+
+    def _4gram_cvc(self, _4gram, before, after):
+        c1, cverb, sw_the, c2 = _4gram
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            complex_verb=cverb,
+            concept2=c2)
+        self.add_item(verb_construct)
 
     def _5gram_group(self, _5gram, before, after):
         concept, sw, number, sws, group = _5gram

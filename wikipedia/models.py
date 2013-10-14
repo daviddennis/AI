@@ -1,5 +1,7 @@
 import itertools
 from django.db import models
+from django.dispatch import receiver
+from wikipedia.lib.utils import autoconnect_to_signals
 
 class Concept(models.Model):
     name = models.CharField(max_length=1000)
@@ -155,10 +157,13 @@ class Amount(models.Model):
     unit = models.ForeignKey(Concept, related_name="unit_set", null=True, blank=True)
 
     def __unicode__(self):
-        if self.unit:
-            return "%d %s of %s" % (self.number, self.unit, self.concept)
+        if self.number:
+            if self.unit:
+                return "%d %s of %s" % (self.number, self.unit, self.concept)
+            else:
+                return "%d %s" % (self.number, self.concept)
         else:
-            return "%d %s" % (self.number, self.concept)
+            return "%s %s" % (self.quantifier, self.concept)
 
 # Lookup
 class Preposition(models.Model):
@@ -199,6 +204,7 @@ class ComplexVerb(models.Model):
             return "%s %s" % (self.verb.name, self.preposition.name)
 
 # NL Structure
+@autoconnect_to_signals
 class VerbConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
     amount1 = models.ForeignKey(Amount, related_name="amount_1_set", null=True, blank=True)
@@ -214,7 +220,23 @@ class VerbConstruct(models.Model):
 
     context = models.ForeignKey(Context, related_name="verb_context_set", null=True, blank=True)
 
+    time = models.CharField(max_length=200, null=True, blank=True)
+
+    @property
+    def arg1(self):
+        return self.concept1 or self.amount1
+
+    @property
+    def arg2(self):
+        return self.concept2 or self.amount2 or self.assertion2 or self.question_fragment2 or self.verb_construct2
+
+    def pre_save(self):
+        if self.verb:
+            if self.verb.form == 'past':
+                self.time = 'THE PAST'
+
     def __unicode__(self):
+        output = ''
         if self.verb:
             verb_name = self.verb.name
         elif self.complex_verb:
@@ -223,16 +245,20 @@ class VerbConstruct(models.Model):
         item1 = self.concept1 or self.amount1
 
         if item1 and self.concept2:
-            return "%s(%s, %s)" % (verb_name, item1, self.concept2.name)
+            output = "%s(%s, %s)" % (verb_name, item1, self.concept2.name)
         else:
             if self.amount2:
-                return "%s(%s, %s)" % (verb_name, item1, self.amount2)
+                output = "%s(%s, %s)" % (verb_name, item1, self.amount2)
             else:
                 if self.verb_construct2:
-                    return "%s(%s, %s)" % (verb_name, item1, self.verb_construct2)
+                    output = "%s(%s, %s)" % (verb_name, item1, self.verb_construct2)
                 else:
-                    return "%s(%s)" % (verb_name, (item1 or self.concept2).name)
+                    output = "%s(%s)" % (verb_name, (item1 or self.concept2).name)
 
+        if self.time:
+            output += ' @ %s' % self.time
+
+        return output
 
 # NL Structure
 class IfStmt(models.Model):
@@ -399,4 +425,5 @@ class List():
             return 'List: %s...' % self.items[:3]
         else:
             return 'List: %s' % self.items
+
 

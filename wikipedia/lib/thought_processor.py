@@ -82,6 +82,8 @@ class ThoughtProcessor():
                 self.process_unigram_list(item, before, after)
             if self.pr.recognize([item], "CATEGORY"):
                 self.process_unigram_category(item, before, after)
+            if self.pr.recognize([item], "CONCEPT"):
+                self.process_unigram_concept(item, before, after)
 
     def process_bigrams(self, parsed_sentence):
         bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
@@ -106,6 +108,7 @@ class ThoughtProcessor():
 
         item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
         for i, item_group in enumerate(item_groups):
+            trigram = item_group
             before = parsed_sentence[:i]
             after = parsed_sentence[i+3:]
             # if self.pr.recognize(item_group, "CONCEPT VERB:cause CONCEPT"):
@@ -123,12 +126,19 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT VERB AMOUNT"):
                 result = self.process_verb_amount(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SW:are ADJECTIVE"):
+                result = self.process_are_adj(item_group, before, after)
+                output += [result]
             if self.pr.recognize(item_group, "CONCEPT SW:is CONCEPT"):
                 result = self.process_is(item_group, before, after)
                 output += [result]
             if self.pr.recognize(item_group, "CONCEPT SW:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(trigram, "CONCEPT PREP CONCEPT"):
+                self.process_prepconstruct(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SWS:is_not ADJECTIVE"):
+                self.process_isnot(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:is_not_a CONCEPT"):
                 self.process_trigram_c_isnota_c(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:is_a ASSERTION"):
@@ -365,6 +375,10 @@ class ThoughtProcessor():
         c1 = category.child
         self.reinterpret(before + [c1] + after)
 
+    def process_unigram_concept(self, c1, before, after):
+        if c1.name == "YES":
+            self.add_item(c1)
+
     def process_bigram_names(self, bigram, before, after):
         n1, n2 = bigram
         print n1.rank, n2.rank
@@ -380,7 +394,7 @@ class ThoughtProcessor():
         number, concept = bigram
         amount, created = Amount.objects.get_or_create(
             number=number.number,
-            concept=concept)
+            concept=self.word_mgr.get_plural_concept(concept))
         self.add_amount(amount)
 
     def process_bigram_amount_unit(self, bigram, before, after):
@@ -608,12 +622,19 @@ class ThoughtProcessor():
 
     def process_4gram_property(self, _4gram, before, after):
         c1, punc, s, c2 = _4gram
-        _property, created = Property.objects.get_or_create(
-            parent=c1,
-            key_concept=c2)
-        self.add_item(_property)
-        self.reinterpret(before + [_property] + after)
-        self.reinterpret(before + [c2] + after)
+        if self.word_mgr.is_plural(c2):
+            group, created = Group.objects.get_or_create(
+                parent_concept=c1,
+                child_concept=self.word_mgr.get_singular_concept(c2))
+            self.add_item(group)
+            self.reinterpret(before + [group] + after)
+        else:
+            _property, created = Property.objects.get_or_create(
+                parent=c1,
+                key_concept=c2)
+            self.add_item(_property)
+            self.reinterpret(before + [_property] + after)
+            self.reinterpret(before + [c2] + after)
 
     def process_4gram_property_had(self, _4gram, before, after):
         c1, verb, sw, c2 = _4gram
@@ -833,6 +854,16 @@ class ThoughtProcessor():
         #self.causation.consider_implications(assertion)
         #return assertion
 
+    def process_are_adj(self, item_group, before, after):
+        c1, sw_are, adj = item_group
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            concept2=None,
+            adj2=adj)
+        self.reinterpret(before + [assertion] + after)
+
     def process_on(self, triple, before, after):
         concept1, sw, concept2 = triple
         group, created = Group.objects.get_or_create(
@@ -899,6 +930,23 @@ class ThoughtProcessor():
             concept2=c2)
         self.add_assertion(assertion)
 
+    def process_prepconstruct(self, trigram, before, after):
+        c1, prep, c2 = trigram
+        prep_construct, created = PrepConstruct.objects.get_or_create(
+            concept1=c1,
+            preposition=prep,
+            concept2=c2)
+        self.add_item(prep_construct)
+
+    def process_isnot(self, trigram, before, after):
+        c1, isnot, adj = trigram
+        relation = get_object_or_None(Relation, name="IsNot")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            adj2=adj)
+        self.add_assertion(assertion)
+
     def process_trigram_property_of(self, item_group, before, after):
         c1, sw_of, c2 = item_group
         _property, created = Property.objects.get_or_create(
@@ -909,7 +957,7 @@ class ThoughtProcessor():
         self.reinterpret(before + [c2] + after)
 
     def process_is_a(self, triple, before, after):
-        concept1, stopword, concept2 = triple
+        concept1, sws, concept2 = triple
         relation = get_object_or_None(Relation, name="IsA")
         assertion, created = Assertion.objects.get_or_create(
             concept1=concept1,
@@ -921,6 +969,18 @@ class ThoughtProcessor():
             child=concept1)
         self.add_category(new_category)
         self.reinterpret(before + [new_category] + after)
+
+        if concept2.name == "VERB":
+            #if self.word_mgr.is_past_verb(concept2.name):
+            #import en
+            #en.verb.present(concept1.name.lower())
+            v, created = Verb.objects.get_or_create(
+                name=self.word_mgr.get_present_verb(concept1),
+                past_name=self.word_mgr.get_past_verb(concept1),
+                participle_name=self.word_mgr.get_participle_verb(concept1))
+            v.save()
+            self.add_item(v)
+
         return assertion, new_category
 
     def process_is_not_a(self, triple, before, after):

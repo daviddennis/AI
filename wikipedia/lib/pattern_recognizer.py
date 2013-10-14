@@ -63,7 +63,7 @@ class PatternRecognizer():
                 else:
                     return False
                 continue
-            if arg.startswith("ADJECTIVE"):
+            if arg.startswith("ADJ"):
                 if isinstance(item, Adjective):
                     if ':' in arg:
                         if item.name != arg.split(':')[1]:
@@ -124,6 +124,9 @@ class PatternRecognizer():
                     return False
             if arg.startswith("NAME"):
                 if not isinstance(item, PersonName):
+                    return False
+            if arg in ("Q", "QUANTIFIER"):
+                if not isinstance(item, Quantifier):
                     return False
             if arg == "...":
                 continue

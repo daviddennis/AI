@@ -20,20 +20,45 @@ class WordManager():
 
         return item_name
 
+    def is_plural(self, concept):
+        import en
+        plural_concept = get_object_or_None(Concept, name=en.noun.plural(concept.name.lower()))
+        if concept == plural_concept:
+            return plural_concept
+        else:
+            return False
+            
+
     def get_singular_concept(self, concept):
+        import en
         singular_concept = None
-        lemmatizer = WordNetLemmatizer()
+        #lemmatizer = WordNetLemmatizer()
         if ' ' in concept.name:
             tokens = concept.name.split(' ')
-            singular_last_token = lemmatizer.lemmatize(tokens[-1].lower())
+            #singular_last_token = lemmatizer.lemmatize(tokens[-1].lower())
+            singular_last_token = en.noun.singular(tokens[-1].lower())
             singular_concept_name = ' '.join(tokens[:-1] + [singular_last_token])
         else:
-            singular_concept_name = lemmatizer.lemmatize(concept.name.lower()).upper()
+            #singular_concept_name = lemmatizer.lemmatize(concept.name.lower()).upper()
+            singular_concept_name = en.noun.singular(concept.name.lower()).upper()
 
         singular_concept = get_object_or_None(Concept, name=singular_concept_name)
 
         if singular_concept:
             return singular_concept
+        else:
+            return concept
+
+    def get_plural_concept(self, concept):
+        plural_concept = None
+        import en
+        try:
+            plural_concept = get_object_or_None(Concept, name=en.noun.plural(concept.name.lower()))
+        except:
+            pass
+        
+        if plural_concept:
+            return plural_concept
         else:
             return concept
 
@@ -92,3 +117,44 @@ class WordManager():
             for item in items[1:]:
                 parent_set = set([x.parent for x in Category.objects.filter(child=item).all()]) & parent_set
             return list(parent_set)
+
+    def is_a(self, child, parent):
+        if isinstance(child, Concept):
+            if isinstance(parent, Concept):
+                try:
+                    category = Category.objects.get(
+                        parent=parent,
+                        child=child)
+                    if category:
+                        return True
+                except:
+                    for category in child.category_set.all():
+                        next_parent = category.parent
+                        if self.is_a(next_parent, parent):
+                            return True
+
+        return False
+                        
+
+    def get_participle_verb(self, item):
+        import en
+        return self.get_verb(item, verb_func=en.verb.participle)
+
+    def get_present_verb(self, item):
+        import en
+        return self.get_verb(item, verb_func=en.verb.present)        
+
+    def get_past_verb(self, item):
+        import en
+        return self.get_verb(item, verb_func=en.verb.past)
+
+    # TODO: FIX!!!
+    def get_verb(self, item, verb_func=str):
+        if isinstance(item, str):
+            return get_object_or_None(Verb, past_name=verb_func(item.lower()))
+        if isinstance(item, Concept):
+            return get_object_or_None(Verb, past_name=verb_func(item.name.lower()))
+        try:
+            return get_object_or_None(Verb, past_name=verb_func(item.name.lower()))
+        except:
+            return get_object_or_None(Verb, past_name=verb_func(item.string.lower()))

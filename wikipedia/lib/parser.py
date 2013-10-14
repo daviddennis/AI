@@ -6,7 +6,7 @@ import string
 import sys
 
 stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')] \
-                     + [x.upper() for x in ('mine')])
+                     + [x.upper() for x in ('mine', 'several', 'also')])
 
 class Parser():
 
@@ -97,7 +97,7 @@ class Parser():
         return before, [new_str]
 
     def tokenize(self, string):
-        if isinstance(string, str):
+        if isinstance(string, str) or isinstance(string, unicode):
             return [x for x in string.split(' ') if x not in ('', ' ')]
         else:
             return []
@@ -152,7 +152,7 @@ class Parser():
         if number_token in self.text_numbers:
             return ([Number(self.text_numbers[number_token])] + [' '.join(tokens[1:])], True)
         number_token = number_token.replace('ST','').replace('ND','').replace('RD','').replace('TH','')
-        number_set = set([str(x) for x in range(9)])
+        number_set = set([str(x) for x in range(10)])
         is_number = True
         for c in number_token:
             if c not in number_set:

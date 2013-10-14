@@ -23,6 +23,7 @@ class Interpreter():
         self.word_mgr = WordManager()
         self.thought_processor = None
         self.time_mgr = TimeManager()
+        self.learned = {}
 
         self.user = get_object_or_None(Concept, name="DAVID DENNIS")
         self.ai = get_object_or_None(Concept, name="AI")
@@ -60,6 +61,8 @@ class Interpreter():
         for i, unigram in enumerate(parsed_sentence):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+1:]
+            if self.pr.recognize([unigram], "NAME"):
+                self.unigram_name(unigram, before, after)
             if self.pr.recognize([unigram], "SW:am"):
                 self.unigram_am(unigram, before, after)
             if self.pr.recognize([unigram], "SW:an"):
@@ -110,6 +113,8 @@ class Interpreter():
         for i, bigram in enumerate(bigrams):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+2:]
+            if self.pr.recognize(bigram, "Q CONCEPT"):
+                self.bigram_q_concept(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
                 self.bigram_adj_c(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT:type SW:of"):
@@ -337,6 +342,13 @@ class Interpreter():
             name_or_none, created = PersonName.objects.get_or_create(name=concept.name)
         if name_or_none:
             self.add_interpretation(before + [name_or_none] + after)
+        adj_or_none = get_object_or_None(Adjective, name=concept.name)
+        if adj_or_none:
+            self.add_interpretation(before + [adj_or_none] + after)
+        else:
+            adj_or_none = get_object_or_None(Adjective, superlative=concept.name) 
+            if adj_or_none:
+                self.add_interpretation(before + [adj_or_none] + after)       
         #verb_or_none = get_object_or_None(Verb, name=concept.name)
         #if verb_or_none:
         #    self.add_interpretation(before + [verb_or_none] + after)
@@ -356,6 +368,14 @@ class Interpreter():
         sw_am = unigram
         sw_is = Stopword("IS")
         self.add_interpretation(before + [sw_is] + after)
+
+    def unigram_name(self, unigram, before, after):
+        pn = unigram
+        concept = get_object_or_None(Concept, name=pn.name)
+        if concept:
+            if concept not in self.learned.get('concepts', []):
+                self.add_item(concept)
+                self.add_interpretation(before + [concept] + after)
 
     def unigram_an(self, unigram, before, after):
         sw_an = unigram
@@ -409,6 +429,13 @@ class Interpreter():
         adj = self.word_mgr.concept_to_adj(c1)
         if adj:
             self.add_interpretation(before + [adj, c2] + after)
+
+    def bigram_q_concept(self, bigram, before, after):
+        q, c1 = bigram
+        amount, created = Amount.objects.get_or_create(
+            quantifier=q,
+            concept=c1)
+        self.add_interpretation(before + [amount] + after)
 
     def bigram_type_of(self, bigram, before, after):
         c1, sw = bigram
@@ -811,6 +838,12 @@ class Interpreter():
         if recurse:
             self.interpret(interpretation)
 
+    def add_item(self, item):
+        key_name = item.__class__.__name__.lower() + 's'
+        self.learned[key_name] = self.learned.get(key_name, [])
+        if item not in self.learned.get(key_name, []):
+            self.learned[key_name] += [item]
+
     def remember(self, key, val):
         self.thinker.remember(val, key)
 
@@ -824,6 +857,7 @@ class Interpreter():
 
     def clear_interpretations(self):
         self.interpretations = []
+        self.learned = {}
 
     def print_once(self, string):
         self.one_item = string

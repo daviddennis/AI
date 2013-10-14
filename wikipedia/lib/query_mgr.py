@@ -6,10 +6,12 @@ from annoying.functions import get_object_or_None
 
 class QueryManager():
 
-    w_words = ['WHO', 'WHAT', 'WHEN', 'WHERE', 'WHY', 'HOW', 'CAN', 'DO']
 
     def __init__(self):
         self.lemmatizer = WordNetLemmatizer()
+        self.w_words = ['WHO', 'WHAT', 'WHEN', 'WHERE', 'WHY', 'HOW']
+        self.verify_words = ['CAN', 'DO', 'DID', 'IS']
+        self.w_words += self.verify_words
 
     def is_query(self, latest):
         if len(latest) <= 1:
@@ -28,10 +30,11 @@ class QueryManager():
                     return True
         return False
 
+
     def construct_query(self, latest):
         query = {
             'type': None,
-            'parsed_sentence': latest
+            'sentence': latest
             }
         first_item = latest[0]
         if isinstance(first_item, StopwordSequence):
@@ -45,6 +48,7 @@ class QueryManager():
 
         return query
 
+
     def process_query(self, query):
         answer = None
         if query['type'] == 'WHAT':
@@ -53,6 +57,7 @@ class QueryManager():
             answer = self.process_can(query)
 
         return answer
+
 
     def process_can(self, query):
         answer = {
@@ -102,6 +107,7 @@ class QueryManager():
             answer['tf_result'] = None
                         
         return answer
+
 
     def process_what(self, query):
         concept_to_define = None
