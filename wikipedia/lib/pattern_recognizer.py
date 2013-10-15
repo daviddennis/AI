@@ -125,6 +125,9 @@ class PatternRecognizer():
             if arg.startswith("NAME"):
                 if not isinstance(item, PersonName):
                     return False
+            if arg.startswith("CPREP"):
+                if not isinstance(item, PrepConstruct):
+                    return False
             if arg in ("Q", "QUANTIFIER"):
                 if not isinstance(item, Quantifier):
                     return False

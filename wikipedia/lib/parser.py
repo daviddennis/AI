@@ -5,12 +5,13 @@ from wikipedia.models import *
 import string
 import sys
 
-stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')] \
+stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had', 'has')] \
                      + [x.upper() for x in ('mine', 'several', 'also')])
 
 class Parser():
 
     def __init__(self):
+        self.en = None
         self.text_numbers = {
             'ONE': 1,
             'TWO': 2,
@@ -62,25 +63,25 @@ class Parser():
                                 before += [items[0]]
                                 remaining = items[1:]
                             else:
-                                items, success = self.parse_name(item)
+                                #items, success = self.parse_name(item)
+                                #if success:
+                                #    before += [items[0]]
+                                #    remaining = items[1:]
+                                #else:
+                                items, success = self.parse_concept(item)
                                 if success:
                                     before += [items[0]]
                                     remaining = items[1:]
                                 else:
-                                    items, success = self.parse_concept(item)
+                                    items, success = self.parse_adjective(item)
                                     if success:
                                         before += [items[0]]
                                         remaining = items[1:]
                                     else:
-                                        items, success = self.parse_adjective(item)
-                                        if success:
-                                            before += [items[0]]
-                                            remaining = items[1:]
-                                        else:
-                                            subitems = self.tokenize(items[0])
-                                            before += [subitems[0]]
-                                            remaining += [' '.join(subitems[1:])]
-
+                                        subitems = self.tokenize(items[0])
+                                        before += [subitems[0]]
+                                        remaining += [' '.join(subitems[1:])]
+                                        
             if remaining == ['']:
                 latest = before
                 break
@@ -183,6 +184,39 @@ class Parser():
             return ([item], False)
 
     def parse_verb(self, item, tags):
+        tokens = self.tokenize(item)
+        verb = None
+
+        if tags:
+            for word, pos_tag in tags:
+                if 'V' in pos_tag:
+                    if word == tokens[0]:
+                        verb_or_none = get_object_or_None(Verb, name=tokens[0])
+                        if verb_or_none:
+                            verb = verb_or_none
+                        else:
+                            verb_or_none = get_object_or_None(Verb, past_name=tokens[0])
+                            if verb_or_none:
+                                verb = verb_or_none
+                                verb.form = 'past'
+                            else:
+                                verb_or_none = get_object_or_None(Verb, participle_name=tokens[0])
+                                if verb_or_none:
+                                    verb = verb_or_none
+                                    verb.form = 'participle'
+        else:
+            verb_or_none = get_object_or_None(Verb, past_name=tokens[0])
+            if verb_or_none:
+                verb = verb_or_none
+                verb.form = 'past'
+
+        if verb:
+            return ([verb] + [' '.join(tokens[1:])], True)
+        else:
+            return ([tokens[0]] + [' '.join(tokens[1:])], False)
+
+
+    def parse_verb_old(self, item, tags):
         tokens = self.tokenize(item)
         verb = None
         verb_or_none = get_object_or_None(Verb, past_name=tokens[0])

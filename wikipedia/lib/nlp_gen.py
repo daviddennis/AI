@@ -52,14 +52,18 @@ class NLPGenerator():
                 arg1 = vc.arg1
                 arg2 = vc.arg2
 
-                arg1_name = arg1.name
-                if ' ' in arg1.name:
-                    person_concept = get_object_or_None(Concept, name="PERSON")
-                    if self.word_mgr.is_a(arg1, person_concept):
-                        sub_tokens = self.parser.tokenize(arg1.name)
-                        arg1_name = ' '.join([x.capitalize() for x in sub_tokens])
 
-                tokens += [arg1_name, verb_token, arg2.name]
+                # bedroom is a room in a house
+                if arg1 and arg2:
+
+                    arg1_name = arg1.name
+                    if ' ' in arg1.name:
+                        person_concept = get_object_or_None(Concept, name="PERSON")
+                        if self.word_mgr.is_a(arg1, person_concept):
+                            sub_tokens = self.parser.tokenize(arg1.name)
+                            arg1_name = ' '.join([x.capitalize() for x in sub_tokens])
+
+                    tokens += [arg1_name, verb_token, arg2.name]
 
                 
 

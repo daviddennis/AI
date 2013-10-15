@@ -9,6 +9,7 @@ from wikipedia.lib.thought_processor import ThoughtProcessor
 from wikipedia.lib.medium_thought_processor import MediumThoughtProcessor
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.lib.question_asker import QuestionAsker
+from wikipedia.lib.auto_translate import translations
 from sys import stdout
 from time import sleep
 import sys
@@ -22,6 +23,8 @@ class Command(BaseCommand):
     context = None
     
     def handle(self, *args, **options):
+        self.en = None
+
         self.word_mgr = WordManager()
         interpreter = Interpreter()
         query_mgr = QueryManager()
@@ -41,10 +44,12 @@ class Command(BaseCommand):
 
         learned_items = set()
         prev_question = None
+        shortest_interpretations = []
+        self.seen = set()
 
-        if 'verbs' in args:
-            print 'Loading en...'
-            import en
+        no_en = False
+        if 'noverbs' in args:
+            no_en = True
 
         print '\nHello\n'
         text = ''
@@ -55,18 +60,18 @@ class Command(BaseCommand):
             if text.lower() in ('bye', 'off', 'later', 'cya', 'end', 'e', 'goodbye', 'exit'):
                 break
 
-            # tb = TextBlob(text)
-            # tags = tb.tags
-            # print tags
-            #tags = [('MARY', 'NN'), ('WALK', 'VBD'), ('TO', 'TO'), ('SCHOOL', 'NN')]
-            try:
-                tags = [(word.upper(), pos_tag) for word, pos_tag in en.sentence.tag(text)]
-            except:
-                #tags = [('MARY', 'NN'), ('WENT', 'VBD'), ('TO', 'TO'), ('THE', 'DT'), ('ZOO', 'NN')]
+            if not self.en and not no_en:
+                import en
+                self.en = en
+
+            if self.en:
+                tags = [(word.upper(), pos_tag) for word, pos_tag in self.en.sentence.tag(text)]
+            else:
                 tags = None
             
             sentence = interpreter.parser.remove_parentheses(text)
             sentence = interpreter.parser.space_punctuation(sentence)
+            sentence = self.run_auto_translate(sentence)
             sentence_list = [sentence]
             parsed_sentence = interpreter.parser.parse(sentence_list, tags=tags)
 
@@ -79,6 +84,7 @@ class Command(BaseCommand):
             print '# interpretations: %s' % num_interpretations
             
             for x in interpretations[:100]:
+                shortest_interpretations += [x]
                 print x
 
             if interpretations:
@@ -91,7 +97,7 @@ class Command(BaseCommand):
 
             for key, val in thought_processor.learned.iteritems():
                 print key,':',val
-            print thought_processor.learned.values()
+            #print thought_processor.learned.values()
             learned_items |= set([x for y in thought_processor.learned.values() for x in y])
             thought_processor.learned = {}
 
@@ -109,9 +115,22 @@ class Command(BaseCommand):
                 learned_items |= set([x for y in thought_processor.learned.values() for x in y])
                 medium_thought_processor.learned = {}
 
+                shortest_interpretations += thoughts
+
+            print '\n\n'
+
+            for x in sorted(shortest_interpretations, key=len)[:10]:
+                print x
+            shortest_interpretations = []
+
             print '\n\n'
 
             #print learned_items
+            #print '{'
+            #for x,y in self.computer_mind.iteritems():
+            #    print x,':',y
+            #print '}'
+            self.seen = set()
 
             # Answer Question
             if prev_question:
@@ -133,8 +152,14 @@ class Command(BaseCommand):
                 
         print '\nGoodbye.\n'
         return
-
-
+            # tb = TextBlob(text)
+            # tags = tb.tags
+            # print tags
+            #tags = [('MARY', 'NN'), ('WALK', 'VBD'), ('TO', 'TO'), ('SCHOOL', 'NN')]
+            #try:
+            #except:
+                #tags = [('MARY', 'NN'), ('WENT', 'VBD'), ('TO', 'TO'), ('THE', 'DT'), ('ZOO', 'NN')]
+                #tags = None
     #print interpretation
     # if query_mgr.is_query(interpretation):
     #     print ':Query'
@@ -147,34 +172,52 @@ class Command(BaseCommand):
 
 
     def remember(self, item, key=None):
-        if len(self.computer_mind) > 30:
+        if len(self.computer_mind) > 2000:
             return
 
         val = item
-        if isinstance(item, Concept):
-            key = item.name
-        elif isinstance(item, Amount):
-            key = item.concept.name
-        elif isinstance(item, List):
-            key = item.type.name
-        elif isinstance(item, Group):
-            if not key:
-                key = item.child_concept.name
 
-        while key in self.computer_mind.keys():
-            key += 'S'
-        
-        self.computer_mind[key] = val
+        keys = []
+        if key:
+            keys += [key]
+
+        if isinstance(item, Concept):
+            keys += [item.name]
+            if self.word_mgr._is(item, "MALE"):
+                keys += ["HE"]
+            else:
+                if self.word_mgr._is(item, "FEMALE"):
+                    keys += ["SHE"]
+                else:
+                    keys += ["IT"]
+        elif isinstance(item, Amount):
+            keys += [item.concept.name]
+            keys += ["AMOUNT"]
+        elif isinstance(item, List):
+            keys += [item.type.name]
+            keys += ["LIST"]
+        elif isinstance(item, Group):
+            keys += [item.child_concept.name]
+            keys += ["GROUP"]
+        elif isinstance(item, Property):
+            if item.key_concept:
+                keys += [item.key_concept.name]
+
+        for key in keys:
+            if key not in self.seen:
+                self.computer_mind[key] = val
+                self.seen |= set([key])
 
 
     def recall(self, item):
+        if isinstance(item, Stopword):
+            return self.computer_mind.get(item.name)
         if isinstance(item, Concept):
             for word_form in self.word_mgr.get_forms(item):
                 #print word_form
                 recalled_item = self.computer_mind.get(word_form)
                 if recalled_item:
                     return recalled_item
-        #elif isinstance
     
     def add_thought(self, thought):
         self.my_mind[thought[0].name] = thought[1]
@@ -190,6 +233,19 @@ class Command(BaseCommand):
         return
 
 
+    def run_auto_translate(self, sentence):
+        before = sentence
+        for key, val in translations.iteritems():
+            _in = key.upper()
+            _out = val.upper()
+            if _in in sentence:
+                sentence = sentence.replace(_in, _out)
+
+        if before != sentence:
+            print "\nTranslations:"
+            print '%s -> %s\n' % (before, sentence)
+
+        return sentence
 
             # if 'IS' in text:
             #     is_index = text.index('IS')

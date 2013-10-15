@@ -98,7 +98,10 @@ class GroupInstance(models.Model):
 class Rank(models.Model):
     group_instance = models.ForeignKey(GroupInstance, related_name="rank_set")
     rank = models.IntegerField()
+    
     concept = models.ForeignKey(Concept, null=True, blank=True)
+    #prep_construct = 
+
     sws = models.ForeignKey(StopwordSequence, null=True, blank=True)
 
     def __unicode__(self):
@@ -208,7 +211,8 @@ class ComplexVerb(models.Model):
 class VerbConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
     amount1 = models.ForeignKey(Amount, related_name="amount_1_set", null=True, blank=True)
-    
+    #assertion1 = models.ForeignKey(Adjective, related_name="vc_adj_1_set", null=True, blank=True)
+
     verb = models.ForeignKey(Verb, null=True, blank=True)
     complex_verb = models.ForeignKey(ComplexVerb, null=True, blank=True)
     
@@ -224,7 +228,7 @@ class VerbConstruct(models.Model):
 
     @property
     def arg1(self):
-        return self.concept1 or self.amount1
+        return self.concept1 or self.amount1 #or self.assertion1
 
     @property
     def arg2(self):
@@ -242,7 +246,7 @@ class VerbConstruct(models.Model):
         elif self.complex_verb:
             verb_name = str(self.complex_verb)
 
-        item1 = self.concept1 or self.amount1
+        item1 = self.concept1 or self.amount1 #or self.assertion1
 
         if item1 and self.concept2:
             output = "%s(%s, %s)" % (verb_name, item1, self.concept2.name)
@@ -333,6 +337,21 @@ class Quantifier(models.Model):
     def __unicode__(self):
         return self.name
 
+class Name(models.Model):
+    concept = models.ForeignKey(Concept, related_name="name_c_set", null=True, blank=True)
+
+    entity = models.ForeignKey(Entity, related_name="name_e_set", null=True, blank=True)
+    prep_construct = models.ForeignKey(PrepConstruct, related_name="name_pc_set", null=True, blank=True)
+    verb_construct = models.ForeignKey(VerbConstruct, related_name="name_vc_set", null=True, blank=True)
+    group_instance = models.ForeignKey(GroupInstance, related_name="name_gi_set", null=True, blank=True)
+
+    @property
+    def arg2(self):
+        return self.entity or self.prep_construct or self.verb_construct or self.group_instance
+    
+    def __unicode__(self):
+        return "(%s) name for (%s)" % (self.concept, self.arg2)
+
 # Class SentenceRecord
 
 # class Dialogue(models.Model):
@@ -358,7 +377,7 @@ class Punctuation():
 
 class Number():
     def __init__(self, name):
-        self.name = name
+        self.name = str(name)
 
     @property
     def number(self):

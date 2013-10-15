@@ -61,6 +61,8 @@ class Interpreter():
         for i, unigram in enumerate(parsed_sentence):
             before = parsed_sentence[:i]
             after = parsed_sentence[i+1:]
+            if self.pr.recognize([unigram], 'PUNC:"'):
+                self.unigram_double_quote(unigram, before, after)
             if self.pr.recognize([unigram], "NAME"):
                 self.unigram_name(unigram, before, after)
             if self.pr.recognize([unigram], "SW:am"):
@@ -71,6 +73,8 @@ class Interpreter():
                 self.unigram_quantifier(unigram, before, after)
             if self.pr.recognize([unigram], "SW"):
                 self.unigram_prep(unigram, before, after)
+            if self.pr.recognize([unigram], "SW"):
+                self.unigram_anaphora(unigram, before, after)
             if self.pr.recognize([unigram], "SW:my"):
                 self.unigram_my(unigram, before, after)
             if self.pr.recognize([unigram], "SW:you"):
@@ -167,6 +171,15 @@ class Interpreter():
                 self.trigram_to_the(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_an CONCEPT"):
                 self.trigram_is_an(trigram, before, after)
+
+            # Math
+            if self.pr.recognize(trigram, "NUMBER PUNC:. NUMBER"):
+                self.trigram_float(trigram, before, after)
+            if self.pr.recognize(trigram, "NUMBER PUNC:^ NUMBER"):
+                self.trigram_exp(trigram, before, after)
+            if self.pr.recognize(trigram, "NUMBER CONCEPT:x NUMBER"):
+                self.trigram_multiply(trigram, before, after)
+
             if self.pr.recognize(trigram, "... PUNC:, ..."):
                 self.trigram_comma(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:are LIST"):
@@ -318,6 +331,7 @@ class Interpreter():
 
     def unigram_concept(self, unigram, before, after):
         concept = unigram
+        self.remember(concept)
         if ' OF ' in concept.name:
             concept_name1, concept_name2 = concept.name.split(' OF ')
             if concept_name1 not in ('THE') and concept_name2 not in ('THE'):
@@ -369,6 +383,10 @@ class Interpreter():
         sw_is = Stopword("IS")
         self.add_interpretation(before + [sw_is] + after)
 
+    def unigram_double_quote(self, unigram, before, after):
+        punc_dq = unigram
+        self.add_interpretation(before + [Punctuation("'")] + after)
+
     def unigram_name(self, unigram, before, after):
         pn = unigram
         concept = get_object_or_None(Concept, name=pn.name)
@@ -387,6 +405,12 @@ class Interpreter():
         prep = get_object_or_None(Preposition, name=sw.name)
         if prep:
             self.add_interpretation(before + [prep] + after)
+
+    def unigram_anaphora(self, unigram, before, after):
+        sw_ref = unigram
+        item = self.recall(sw_ref)
+        if item:
+            self.add_interpretation(before + [item] + after)
 
     def unigram_quantifier(self, sw, before, after):
         quantifier = get_object_or_None(Quantifier, name=sw.name)
@@ -556,6 +580,25 @@ class Interpreter():
         item1, punc, item2 = trigram
         self.add_interpretation(before + [item1])
         self.add_interpretation([item2] + after)
+
+    def trigram_float(self, trigram, before, after):
+        num1, punc_period, num2 = trigram
+        decimal_number = num2.number/float(10**len(num2.name))
+        new_number = Number(num1.number + decimal_number)
+        self.add_interpretation(before + [new_number] + after)
+
+    def trigram_exp(self, trigram, before, after):
+        num1, punc_exp, num2 = trigram
+        if num2.number > 100:
+            return
+        exp_number = num1.number**num2.number
+        new_number = Number(exp_number)
+        self.add_interpretation(before + [new_number] + after)
+
+    def trigram_multiply(self, trigram, before, after):
+        num1, c_x, num2 = trigram
+        new_number = Number(num1.number * num2.number)
+        self.add_interpretation(before + [new_number] + after)
 
     def trigram_are_list(self, trigram, before, after):
         concept, sw, _list = trigram
@@ -844,11 +887,11 @@ class Interpreter():
         if item not in self.learned.get(key_name, []):
             self.learned[key_name] += [item]
 
-    def remember(self, key, val):
-        self.thinker.remember(val, key)
+    def remember(self, val, key=None):
+        self.thinker.remember(val, key=key)
 
-    def recall(self, key):
-        return self.thinker.computer_mind.get(key, None)
+    def recall(self, item):
+        return self.thinker.recall(item)
 
     def return_interpretations(self):
         tmp = self.interpretations[:]

@@ -11,6 +11,8 @@ class WordManager():
         self.parser = Parser()
         self.stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')])
 
+        self.has_prop = get_object_or_None(Relation, name="HasProperty")
+
     def get_root_word(self, item):
         item_name = None
         if isinstance(item, Concept):
@@ -20,13 +22,15 @@ class WordManager():
 
         return item_name
 
+    # Human's toes
     def is_plural(self, concept):
         import en
         plural_concept = get_object_or_None(Concept, name=en.noun.plural(concept.name.lower()))
-        if concept == plural_concept:
-            return plural_concept
-        else:
-            return False
+        if concept and plural_concept:
+            if concept.name == plural_concept.name:
+                return plural_concept
+        
+        return False
             
 
     def get_singular_concept(self, concept):
@@ -135,6 +139,33 @@ class WordManager():
 
         return False
                         
+    def _is(self, item1, item2):
+        c1 = item1
+        c2 = None
+        adj2 = None
+        if isinstance(item1, str):
+            c1 = get_object_or_None(Concept, name=item1)
+        if isinstance(item2, str):
+            c2 = get_object_or_None(Concept, name=item2)
+            adj2 = get_object_or_None(Adjective, name=item2)
+        if not c1 or not (c2 or adj2):
+            return False
+        if c2:
+            assertions = Assertion.objects.filter(
+                concept1=c1,
+                relation=self.has_prop,
+                concept2=c2).all()
+            if assertions:
+                return True
+        if adj2:
+            assertions = Assertion.objects.filter(
+                concept1=c1,
+                relation=self.has_prop,
+                adj2=adj2).all()
+            if assertions:
+                return True
+
+        return False
 
     def get_participle_verb(self, item):
         import en

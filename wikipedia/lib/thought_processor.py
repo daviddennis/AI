@@ -84,6 +84,8 @@ class ThoughtProcessor():
                 self.process_unigram_category(item, before, after)
             if self.pr.recognize([item], "CONCEPT"):
                 self.process_unigram_concept(item, before, after)
+            if self.pr.recognize([item], "ASSERTION"):
+                self.process_unigram_assertion(item, before, after)
 
     def process_bigrams(self, parsed_sentence):
         bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
@@ -92,6 +94,8 @@ class ThoughtProcessor():
             after = parsed_sentence[i+2:]
             if self.pr.recognize(bigram, "NAME NAME"):
                 self.process_bigram_names(bigram, before, after)
+            if self.pr.recognize(bigram, "SW SW"):
+                self.process_bigram_sw_sequence(bigram, before, after)
             if self.pr.recognize(bigram, "NUMBER CONCEPT"):
                 self.process_bigram_amount(bigram, before, after)
             if self.pr.recognize(bigram, "SW VERBCONSTRUCT"):
@@ -155,6 +159,10 @@ class ThoughtProcessor():
                 self.process_of_the(item_group, before, after)
             if self.pr.recognize(item_group, 'VERB:switch CONCEPT:context CONCEPT'):
                 self.process_switch_context(parsed_sentence)
+            if self.pr.recognize(item_group, 'LIST SW:are CONCEPT'):
+                self.process_list_are_c(item_group, before, after)
+            if self.pr.recognize(item_group, 'CONCEPT VERB:has AMOUNT'):
+                self.process_c_has_amount(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SW:on CONCEPT"):
                 result = self.process_on(item_group, before, after)
                 output += [result]
@@ -253,6 +261,8 @@ class ThoughtProcessor():
             after = parsed_sentence[i+5:]
             if self.pr.recognize(_5gram, "CONCEPT SW:is VERB SW:as CONCEPT"):
                 self.process_is_verb_as(_5gram, before, after)
+            if self.pr.recognize(_5gram, "VERB:remove CONCEPT:concept PUNC:' CONCEPT PUNC:'"):
+                self.process_remove_quote(_5gram, before, after)
 
 
     def process_6grams(self, parsed_sentence):
@@ -379,9 +389,11 @@ class ThoughtProcessor():
         if c1.name == "YES":
             self.add_item(c1)
 
+    def process_unigram_assertion(self, ass, before, after):
+        self.reinterpret(before + [ass.concept1] + after)
+
     def process_bigram_names(self, bigram, before, after):
         n1, n2 = bigram
-        print n1.rank, n2.rank
         if not n1.rank or not n2.rank:
             return
         entity, created = Entity.objects.get_or_create(
@@ -389,6 +401,12 @@ class ThoughtProcessor():
             last_name=n2.name)
         self.add_item(entity)
         self.reinterpret(before + [entity] + after)
+
+    def process_bigram_sw_sequence(self, bigram, before, after):
+        sw1, sw2 = bigram
+        sws, created = StopwordSequence.objects.get_or_create(
+            string=sw1.name + " " + sw2.name)
+        self.reinterpret(before + [sws] + after)
 
     def process_bigram_amount(self, bigram, before, after):
         number, concept = bigram
@@ -515,6 +533,11 @@ class ThoughtProcessor():
         self.add_category(category)
         self.reinterpret(before + [category] + after)
 
+    def process_remove_quote(self, _5gram, before, after):
+        verb, c1, punc_quote1, c2, punc_quote2 = _5gram
+        print "Removed %s" % c2
+        c2.delete()
+
     def process_4gram_alias(self, _4gram, before, after):
         c1, sw_or, c2, sws_isa = _4gram
         alias, created = Alias.objects.get_or_create(
@@ -549,6 +572,26 @@ class ThoughtProcessor():
             new_context, created = Context.objects.get_or_create(concept=context_concept)
             self.thinker.context = new_context
             print 'Switched context to %s' % self.thinker.context
+
+    def process_list_are_c(self, item_group, before, after):
+        _list, sw_are, c2 = item_group
+        c2 = self.word_mgr.get_singular_concept(c2)
+        for c1 in _list.items:
+            category, created = Category.objects.get_or_create(
+                parent=c2,
+                child=c1)
+            self.add_item(category)
+            self.reinterpret(before + [category] + after)
+
+    def process_c_has_amount(self, trigram, before, after):
+        c1, verb, amount = trigram
+        amount_concept = self.word_mgr.get_singular_concept(amount.concept)
+        group, created = Group.objects.get_or_create(
+            parent_concept=c1,
+            child_concept=amount_concept,
+            size=amount.number)
+        self.add_item(group)
+        self.reinterpret(before + [group] + after)
 
     def process_into(self, parsed_sentence):
         verb, concept1, sw, concept2 = tuple(parsed_sentence)
@@ -633,6 +676,7 @@ class ThoughtProcessor():
                 parent=c1,
                 key_concept=c2)
             self.add_item(_property)
+            self.remember(_property)
             self.reinterpret(before + [_property] + after)
             self.reinterpret(before + [c2] + after)
 
@@ -653,29 +697,55 @@ class ThoughtProcessor():
 
     def process_from_the(self, _6gram, before, after):
         c1, sws1, number, c2, sws2, c3 = _6gram
-        potential_groups = Group.objects.filter(child_concept=c3).all()
-        overarching_concept = None
-        for potential_group in potential_groups:
-            overarching_concept = potential_group.parent_concept
-            potential_relevant_groups = Group.objects.filter(parent_concept=overarching_concept,
-                                                         child_concept=c2)
-            for potential_relevant_group in potential_relevant_groups:
-                categories = Category.objects.filter(parent=potential_relevant_group.child_concept,
-                                                     child=c1).all()
-                if categories:
-                    group_instance, created = GroupInstance.objects.get_or_create(
-                        group=potential_relevant_group,
-                        parent_concept=overarching_concept,
-                        child_concept=c1)
-                    self.add_group_instance(group_instance)
-                    rank, created = Rank.objects.get_or_create(
-                        rank=int(number.number),
-                        concept=c3,
-                        group_instance=group_instance,
-                        sws=sws2)
-                    self.add_item(rank)
-                    return
-                    #self.reinterpret(before + [number, group] + after)
+        # No data structure supports this!!!
+        
+        distance_concept = get_object_or_None(Concept, name="DISTANCE")
+
+        # SS->Planet
+        c2_groups = Group.objects.filter(child_concept=c2).all()
+        if c2_groups:
+            c2_group = c2_groups[0]
+            parent = c2_group.parent_concept # SS
+            #SS's Sun
+            c3_properties = Property.objects.filter(
+                parent=parent,
+                key_concept=c3)
+            if c3_properties:
+                group_instance, created = GroupInstance.objects.get_or_create(
+                    group=c2_group,
+                    parent_concept=c2_group.parent_concept,
+                    child_concept=c1) # SS->Planet : SS->[jupiter]
+                self.add_item(group_instance)
+                rank, created = Rank.objects.get_or_create(
+                    group_instance=group_instance,
+                    concept=distance_concept,
+                    rank=number.number)
+                self.add_item(rank)
+            
+
+        # potential_groups = Group.objects.filter(child_concept=c3).all()
+        # overarching_concept = None
+        # for potential_group in potential_groups:
+        #     overarching_concept = potential_group.parent_concept
+        #     potential_relevant_groups = Group.objects.filter(parent_concept=overarching_concept,
+        #                                                  child_concept=c2)
+        #     for potential_relevant_group in potential_relevant_groups:
+        #         categories = Category.objects.filter(parent=potential_relevant_group.child_concept,
+        #                                              child=c1).all()
+        #         if categories:
+        #             group_instance, created = GroupInstance.objects.get_or_create(
+        #                 group=potential_relevant_group,
+        #                 parent_concept=overarching_concept,
+        #                 child_concept=c1)
+        #             self.add_group_instance(group_instance)
+        #             rank, created = Rank.objects.get_or_create(
+        #                 rank=int(number.number),
+        #                 concept=c3,
+        #                 group_instance=group_instance,
+        #                 sws=sws2)
+        #             self.add_item(rank)
+        #             return
+        #             #self.reinterpret(before + [number, group] + after)
 
     def process_prep_lists(self, _6gram, before, after):
         c1, verb, prep1, _list1, prep2, _list2 = _6gram
@@ -937,6 +1007,7 @@ class ThoughtProcessor():
             preposition=prep,
             concept2=c2)
         self.add_item(prep_construct)
+        self.reinterpret(before + [prep_construct] + after)
 
     def process_isnot(self, trigram, before, after):
         c1, isnot, adj = trigram
