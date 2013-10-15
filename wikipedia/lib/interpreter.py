@@ -101,6 +101,8 @@ class Interpreter():
                 self.unigram_concept(unigram, before, after)
             if self.pr.recognize([unigram], "SW:can"):
                 self.unigram_exclude_word(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:will"):
+                self.unigram_exclude_word(unigram, before, after)
             if self.pr.recognize([unigram], "CONCEPT:the_way"):
                 self.unigram_exclude_word(unigram, before, after)
             if self.pr.recognize([unigram], "SW:we"):

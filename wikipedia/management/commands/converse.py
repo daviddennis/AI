@@ -119,11 +119,11 @@ class Command(BaseCommand):
 
             print '\n\n'
 
-            for x in sorted(shortest_interpretations, key=len)[:10]:
-                print x
-            shortest_interpretations = []
+            #for x in sorted(shortest_interpretations, key=len)[:10]:
+            #    print x
+            #shortest_interpretations = []
 
-            print '\n\n'
+            #print '\n\n'
 
             #print learned_items
             #print '{'

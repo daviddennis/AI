@@ -69,7 +69,7 @@ class MediumThoughtProcessor():
                 self.trigram_property_amount(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:is PROPERTY"):
                 self.trigram_c_is_property(trigram, before, after)
-            if self.pr.recognize(trigram, "PROPERTY VERB:had AMOUNT"):
+            if self.pr.recognize(trigram, "PROPERTY VERB:has AMOUNT"):
                 self.trigram_p_v_amount(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY PREP PROPERTY"):
                 self.trigram_ppp(trigram, before, after)

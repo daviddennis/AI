@@ -106,6 +106,11 @@ class ThoughtProcessor():
                 self.process_bigram_amount_unit(bigram, before, after)
             if self.pr.recognize(bigram, "ADJECTIVE CONCEPT"):
                 self.process_bigram_adj_c(bigram, before, after)
+            if self.pr.recognize(bigram, "QUANTIFIER VERBCONSTRUCT"):
+                self.bigram_quantifer(bigram, before, after)
+            if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
+                self.bigram_cc(bigram, before, after)
+
 
     def process_trigrams(self, parsed_sentence):
         output = []
@@ -136,7 +141,7 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT SW:is CONCEPT"):
                 result = self.process_is(item_group, before, after)
                 output += [result]
-            if self.pr.recognize(item_group, "CONCEPT SW:has CONCEPT"):
+            if self.pr.recognize(item_group, "CONCEPT VERB:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
             if self.pr.recognize(trigram, "CONCEPT PREP CONCEPT"):
@@ -224,9 +229,9 @@ class ThoughtProcessor():
                 self.process_basic_prep(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT PUNC:' SW:s CONCEPT"):
                 self.process_4gram_property(_4gram, before, after)
-            if self.pr.recognize(_4gram, "CONCEPT VERB:had SW:a CONCEPT"):
+            if self.pr.recognize(_4gram, "CONCEPT VERB:has SW:a CONCEPT"):
                 self.process_4gram_property_had(_4gram, before, after)
-            if self.pr.recognize(_4gram, "CONCEPT VERB:had SW:an CONCEPT"):
+            if self.pr.recognize(_4gram, "CONCEPT VERB:has SW:an CONCEPT"):
                 self.process_4gram_property_had(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT SW:or CONCEPT SWS:is_a"):
                 self.process_4gram_alias(_4gram, before, after)
@@ -435,6 +440,29 @@ class ThoughtProcessor():
         self.add_item(assertion)
         self.reinterpret(before + [assertion] + after)
 
+    def bigram_quantifer(self, bigram, before, after):
+        q, vc = bigram
+        vc.quantifier = q
+        vc.save()
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
+    def bigram_cc(self, bigram, before, after):
+        c1, c2 = bigram
+        new_c = get_object_or_None(Concept, name=c1.name + " " + c2.name)
+        if new_c:
+            self.reinterpret(before + [new_c] + after)
+        else:
+            c1 = self.word_mgr.get_singular_concept(c1)
+            new_c = get_object_or_None(Concept, name=c1.name + " " + c2.name)
+            if new_c:
+                self.reinterpret(before + [new_c] + after)
+            else:
+                c2 = self.word_mgr.get_singular_concept(c2)
+                new_c = get_object_or_None(Concept, name=c1.name + " " + c2.name)
+                if new_c:
+                    self.reinterpret(before + [new_c] + after)
+        
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
         if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
@@ -902,7 +930,7 @@ class ThoughtProcessor():
                         print 'Are all %s %s?' % (property_name, highest[0])
 
     def process_has(self, triple, before, after):
-        concept1, stopword, concept2 = triple
+        concept1, v_has, concept2 = triple
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=concept1,
@@ -1029,12 +1057,12 @@ class ThoughtProcessor():
 
     def process_is_a(self, triple, before, after):
         concept1, sws, concept2 = triple
-        relation = get_object_or_None(Relation, name="IsA")
-        assertion, created = Assertion.objects.get_or_create(
-            concept1=concept1,
-            relation=relation,
-            concept2=concept2)
-        self.add_assertion(assertion)
+        #relation = get_object_or_None(Relation, name="IsA")
+        #assertion, created = Assertion.objects.get_or_create(
+        #    concept1=concept1,
+        #    relation=relation,
+        #    concept2=concept2)
+        #self.add_assertion(assertion)
         new_category, created = Category.objects.get_or_create(
             parent=concept2,
             child=concept1)
@@ -1049,21 +1077,27 @@ class ThoughtProcessor():
                 name=self.word_mgr.get_present_verb(concept1),
                 past_name=self.word_mgr.get_past_verb(concept1),
                 participle_name=self.word_mgr.get_participle_verb(concept1))
-            v.save()
             self.add_item(v)
 
-        return assertion, new_category
+        return new_category
 
     def process_is_not_a(self, triple, before, after):
-        concept1, sws, concept2 = triple
-        assertions = Assertion.objects.filter(
-            concept1=concept1,
-            relation__name="IsA",
-            concept2=concept2)
-        if assertions:
-            for assertion in assertions:
-                assertion.delete()
-            print 'Removed %s' % assertions[0]
+        c1, sws, c2 = triple
+        categories = Category.objects.filter(
+            parent=c2,
+            child=c1).all()
+        if categories:
+            for ca in categories:
+                print "Removed %s" % ca
+                ca.delete()
+        #assertions = Assertion.objects.filter(
+        #    concept1=concept1,
+        #    relation__name="IsA",
+        #    concept2=concept2)
+        #if assertions:
+        #    for assertion in assertions:
+        #        assertion.delete()
+        #    print 'Removed %s' % assertions[0]
 
     def process_is_not(self, triple, before, after):
         concept1, sws, concept2 = triple

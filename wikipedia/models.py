@@ -209,6 +209,8 @@ class ComplexVerb(models.Model):
 # NL Structure
 @autoconnect_to_signals
 class VerbConstruct(models.Model):
+    quantifier = models.ForeignKey('Quantifier', related_name="vc_quant_set", null=True, blank=True)
+
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
     amount1 = models.ForeignKey(Amount, related_name="amount_1_set", null=True, blank=True)
     #assertion1 = models.ForeignKey(Adjective, related_name="vc_adj_1_set", null=True, blank=True)
@@ -241,6 +243,7 @@ class VerbConstruct(models.Model):
 
     def __unicode__(self):
         output = ''
+
         if self.verb:
             verb_name = self.verb.name
         elif self.complex_verb:
@@ -261,6 +264,9 @@ class VerbConstruct(models.Model):
 
         if self.time:
             output += ' @ %s' % self.time
+
+        if self.quantifier:
+            output = str(self.quantifier) + '+' + output
 
         return output
 
