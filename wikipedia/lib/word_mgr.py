@@ -22,17 +22,19 @@ class WordManager():
 
         return item_name
 
-    # Human's toes
-    def is_plural(self, concept):
-        import en
-        plural_concept = get_object_or_None(Concept, name=en.noun.plural(concept.name.lower()))
-        if concept and plural_concept:
-            if concept.name == plural_concept.name:
+    def is_plural(self, item):
+
+        if isinstance(item, Concept):
+            plural_concept = get_object_or_None(Concept, plural_name=item.name)
+            if plural_concept:
+                return plural_concept
+        elif isinstance(item, str):
+            plural_concept = get_object_or_None(Concept, plural_name=item)
+            if plural_concept:
                 return plural_concept
         
         return False
             
-
     def get_singular_concept(self, concept):
         import en
         singular_concept = None
@@ -55,6 +57,7 @@ class WordManager():
 
     def get_plural_concept(self, concept):
         plural_concept = None
+
         import en
         try:
             plural_concept = get_object_or_None(Concept, name=en.noun.plural(concept.name.lower()))

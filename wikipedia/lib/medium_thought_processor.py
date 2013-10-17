@@ -75,6 +75,8 @@ class MediumThoughtProcessor():
                 self.trigram_ppp(trigram, before, after)
             if self.pr.recognize(trigram, "CPREP SWS:is_a ASSERTION"):
                 self.trigram_cprep_isa_ass(trigram, before, after)
+            if self.pr.recognize(trigram, "VERBCONSTRUCT PREP CONCEPT"):
+                self.trigram_vc_prep_c(trigram, before, after)
 
 
     def process_4grams(self, parsed_sentence):
@@ -235,6 +237,14 @@ class MediumThoughtProcessor():
                 relation=relation,
                 concept2=assertion.concept2)
             self.add_item(new_assertion)
+
+    def trigram_vc_prep_c(self, trigram, before, after):
+        vc, prep, concept = trigram
+        prep_construct, created = PrepConstruct.objects.get_or_create(
+            vc1=vc,
+            preposition=prep,
+            concept2=concept)
+        self.add_item(prep_construct)
 
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram

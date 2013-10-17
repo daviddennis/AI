@@ -363,13 +363,13 @@ class Interpreter():
                     self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
         if self.time_mgr.recognize_time(concept.name):
             self.add_interpretation(before + [Time(concept.name)] + after)
-        try:
-            name_or_none = get_object_or_None(PersonName, name=concept.name)
-        except MultipleObjectsReturned:
-            PersonName.objects.filter(name=concept.name).all().delete()
-            name_or_none, created = PersonName.objects.get_or_create(name=concept.name)
-        if name_or_none:
-            self.add_interpretation(before + [name_or_none] + after)
+        # try:
+        #     name_or_none = get_object_or_None(PersonName, name=concept.name)
+        # except MultipleObjectsReturned:
+        #     PersonName.objects.filter(name=concept.name).all().delete()
+        #     name_or_none, created = PersonName.objects.get_or_create(name=concept.name)
+        # if name_or_none:
+        #     self.add_interpretation(before + [name_or_none] + after)
         adj_or_none = get_object_or_None(Adjective, name=concept.name)
         if adj_or_none:
             self.add_interpretation(before + [adj_or_none] + after)
@@ -455,9 +455,9 @@ class Interpreter():
     def bigram_the(self, bigram, before, after):
         sw, concept = bigram
         bigram = list(bigram)
-        concept_as_the = get_object_or_None(Concept, name='the '.upper() + concept.name)
+        concept_as_the = get_object_or_None(Concept, name='THE ' + concept.name)
         if concept_as_the:
-            if concept.hit < 1:
+            if concept.hit < 2:
                 concept.hit += 1
                 concept_as_the.hit += 1
                 self.add_interpretation(before + [concept_as_the] + after)

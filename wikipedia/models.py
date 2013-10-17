@@ -5,6 +5,7 @@ from wikipedia.lib.utils import autoconnect_to_signals
 
 class Concept(models.Model):
     name = models.CharField(max_length=1000)
+    plural_name = models.CharField(max_length=500, null=True, blank=True)
     frequency = models.IntegerField(null=True)
     stats_status = models.CharField(max_length=200, default="needs update", null=False)
     url = models.CharField(max_length=2000, null=True)
@@ -77,10 +78,26 @@ class Group(models.Model):
     size = models.IntegerField(null=True, blank=True)
 
     def __unicode__(self):
-        val = "%s -> [%s, %s, %s, ...]" % (self.parent_concept, 
-                                           self.child_concept, 
-                                           self.child_concept,
-                                           self.child_concept)
+        if self.size:
+            if self.size == 3:
+                val = "%s -> [%s, %s, %s]" % (self.parent_concept, 
+                                              self.child_concept, 
+                                              self.child_concept,
+                                              self.child_concept)
+            elif self.size == 2:
+                val = "%s -> [%s, %s]" % (self.parent_concept, 
+                                          self.child_concept, 
+                                          self.child_concept)
+            else:
+                val = "%s -> [%s, %s, %s, ...]" % (self.parent_concept, 
+                                                   self.child_concept, 
+                                                   self.child_concept,
+                                                   self.child_concept)
+        else:   
+            val = "%s -> [%s, %s, %s, ...]" % (self.parent_concept, 
+                                               self.child_concept, 
+                                               self.child_concept,
+                                               self.child_concept)
         if self.size:
             val += "*(%d)" % self.size
         return val
@@ -297,12 +314,16 @@ class QuestionFragment(models.Model):
 
 
 class PrepConstruct(models.Model):
-    concept1 = models.ForeignKey(Concept, related_name="pc_1_set")
+    concept1 = models.ForeignKey(Concept, related_name="pc_c_1_set", null=True, blank=True)
+    vc1 = models.ForeignKey(VerbConstruct, related_name="pc_vc_1_set", null=True, blank=True)
+    
     preposition = models.ForeignKey(Preposition)
+
     concept2 = models.ForeignKey(Concept, related_name="pc_2_set")
 
     def __unicode__(self):
-        return "%s %s %s" % (self.concept1, 
+        arg1 = self.concept1 or self.vc1
+        return "%s %s %s" % (arg1, 
                              self.preposition.name.lower(),
                              self.concept2)
 
