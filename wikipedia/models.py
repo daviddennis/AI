@@ -390,15 +390,29 @@ class Number():
         return float(self.name)
 
     def __repr__(self):
-        return 'Number: %s' % self.name
+        return "Number: %s" % ("{:,.2f}".format(float(self.name)))
+
 
 class Time():
     
-    def __init__(self, name):
+    def __init__(self, name, _type=None):
         self.name = name
+        self.type = _type
 
     def __repr__(self):
-        return 'Time: %s' % self.name
+        if self.type:
+            return '(%s) %s' % (self.type, self.name)
+        else:
+            return 'Time: %s' % (self.name)
+
+class Money():
+    
+    def __init__(self, name, sign="$"):
+        self.name = name
+        self.sign = sign
+        
+    def __repr__(self):
+        return "Money: %s %s" % (self.sign, "{:,.2f}".format(float(self.name)))
 
 class List():
 

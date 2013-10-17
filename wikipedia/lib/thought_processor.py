@@ -110,6 +110,12 @@ class ThoughtProcessor():
                 self.bigram_quantifer(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
                 self.bigram_cc(bigram, before, after)
+            if self.pr.recognize(bigram, "TIME VERBCONSTRUCT"):
+                self.bigram_time_vc(bigram, before, after)
+            if self.pr.recognize(bigram, "PUNC:$ NUMBER"):
+                self.bigram_money(bigram, before, after)
+            if self.pr.recognize(bigram, "NUMBER PUNC:%"):
+                self.bigram_percent(bigram, before, after)
 
 
     def process_trigrams(self, parsed_sentence):
@@ -168,6 +174,8 @@ class ThoughtProcessor():
                 self.process_list_are_c(item_group, before, after)
             if self.pr.recognize(item_group, 'CONCEPT VERB:has AMOUNT'):
                 self.process_c_has_amount(trigram, before, after)
+            if self.pr.recognize(item_group, 'NUMBER PUNC:, NUMBER'):
+                self.process_trigram_large_number(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SW:on CONCEPT"):
                 result = self.process_on(item_group, before, after)
                 output += [result]
@@ -462,7 +470,26 @@ class ThoughtProcessor():
                 new_c = get_object_or_None(Concept, name=c1.name + " " + c2.name)
                 if new_c:
                     self.reinterpret(before + [new_c] + after)
+
         
+    def bigram_time_vc(self, bigram, before, after):
+        time, vc = bigram
+        vc.time = time.name
+        vc.save()
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
+
+    def bigram_money(self, bigram, before, after):
+        punc_sign, num1 = bigram
+        money = Money(num1.number, sign=punc_sign.name)
+        self.add_item(money)
+        self.reinterpret(before + [money] + after)
+
+    def bigram_percent(self, bigram, before, after):
+        num1, punc = bigram
+        self.reinterpret(before + [num1.number/100] + after)
+
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
         if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
@@ -620,6 +647,11 @@ class ThoughtProcessor():
             size=amount.number)
         self.add_item(group)
         self.reinterpret(before + [group] + after)
+
+    def process_trigram_large_number(self, trigram, before, after):
+        num1, punc, num2 = trigram
+        new_num = Number(num1.number * 1000 + num2.number)
+        self.reinterpret(before + [new_num] + after)
 
     def process_into(self, parsed_sentence):
         verb, concept1, sw, concept2 = tuple(parsed_sentence)

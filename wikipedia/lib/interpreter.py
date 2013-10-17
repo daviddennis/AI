@@ -12,7 +12,7 @@ from annoying.functions import get_object_or_None
 
 class Interpreter():
 
-    ref_words = ['IT', 'THEY', 'THEM', 'THIS', 'THESE', 'THAT', 'THOSE']
+    ref_words = ['THIS', 'THESE', 'THAT', 'THOSE', 'THEIR', 'THERE', 'OUR']
 
     def __init__(self):
         self.parser = Parser()        
@@ -149,6 +149,10 @@ class Interpreter():
                 self.bigram_your(bigram, before, after)
             if self.pr.recognize(bigram, "SW CONCEPT"):
                 self.bigram_anaphoric_ref(bigram, before, after)
+            if self.pr.recognize(bigram, "PREP:in NUMBER"):
+                self.bigram_year(bigram, before, after)
+            if self.pr.recognize(bigram, "CONCEPT NUMBER"):
+                self.bigram_small_date(bigram, before, after)
 
 
     def interpret_trigrams(self, parsed_sentence):
@@ -182,8 +186,8 @@ class Interpreter():
             if self.pr.recognize(trigram, "NUMBER CONCEPT:x NUMBER"):
                 self.trigram_multiply(trigram, before, after)
 
-            if self.pr.recognize(trigram, "... PUNC:, ..."):
-                self.trigram_comma(trigram, before, after)
+            #if self.pr.recognize(trigram, "... PUNC:, ..."):
+            #    self.trigram_comma(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:are LIST"):
                 self.trigram_are_list(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:are CONCEPT"):
@@ -200,6 +204,10 @@ class Interpreter():
                 self.trigram_v_and_v(trigram, before, after)
             if self.pr.recognize(trigram, "ADJECTIVE SW:or ADJECTIVE"):
                 self.trigram_adj_and_adj(trigram, before, after)
+            if self.pr.recognize(trigram, "NUMBER PUNC:- NUMBER"):
+                self.trigram_year_range(trigram, before, after)
+            if self.pr.recognize(trigram, "NUMBER CONCEPT NUMBER"):
+                self.trigram_alt_date(trigram, before, after)
 
 
     def interpret_4grams(self, parsed_sentence):
@@ -226,6 +234,8 @@ class Interpreter():
                 self._4gram_and(_4gram, before, after)
             if self.pr.recognize(_4gram, "VERB CONCEPT SW:and CONCEPT"):
                 self._4gram_verb_and(_4gram, before, after)
+            if self.pr.recognize(_4gram, "PREP:on CONCEPT NUMBER NUMBER"):
+                self._4gram_date(_4gram, before, after)
 
     def interpret_5grams(self, parsed_sentence):
         _5grams = [(v,w,x,y,z) for v,w,x,y,z in zip(parsed_sentence, 
@@ -244,6 +254,8 @@ class Interpreter():
                 self._5gram_and(_5gram, before, after)
             if self.pr.recognize(_5gram, "CONCEPT SW:are VERB SW:by CONCEPT"):
                 self._5gram_by(_5gram, before, after)
+            if self.pr.recognize(_5gram, "PREP:on CONCEPT NUMBER PUNC:, NUMBER"):
+                self._5gram_date(_5gram, before, after)
             #if self.pr.recognize(_5gram, "VERB PREP CONCEPT PREP CONCEPT"):  ### spoke on island of corsica - not working
             #    self._5gram_break_complex_verb(_5gram, before, after)
 
@@ -539,6 +551,22 @@ class Interpreter():
             if recalled_item:
                 self.add_interpretation(before + [recalled_item] + after)
 
+    def bigram_year(self, bigram, before, after):
+        _in, number = bigram
+        if number.number.is_integer():
+            year = Time(int(number.number))
+            self.add_interpretation(before + [_in, year] + after)
+
+    def bigram_small_date(self, bigram, before, after):
+        c1_month, num1 = bigram
+        if self.time_mgr.is_month(c1_month):
+            if self.time_mgr.is_day(num1):
+                time = Time("%s %s" % (c1_month.name, int(num1.number)), _type="DATE")
+                self.add_interpretation(before + [time] + after)
+            elif self.time_mgr.is_year(num1):
+                time = Time("%s %s" % (c1_month.name, int(num1.number)), _type="DATE")
+                self.add_interpretation(before + [time] + after)                
+
     def trigram_verb_construct(self, trigram, before, after):
         c1, v1, c2 = trigram
         verb_construct, created = VerbConstruct.objects.get_or_create(
@@ -647,6 +675,21 @@ class Interpreter():
         self.add_interpretation(before + [adj1] + after)
         self.add_interpretation(before + [adj2] + after)
 
+    def trigram_year_range(self, trigram, before, after):
+        num1, punc, num2 = trigram
+        if num1.number <= 10000 and num1.number <= 10000:
+            if num1.number.is_integer() and num1.number.is_integer():
+                time = Time("%d-%d" % (num1.number, num2.number), _type="RANGE")
+                self.add_interpretation(before + [time] + after)
+
+    def trigram_alt_date(self, trigram, before, after):
+        num1, concept_month, num2 = trigram
+        if self.time_mgr.is_day(num1):
+            if self.time_mgr.is_month(concept_month):
+                if self.time_mgr.is_year(num1):
+                    time = Time("%s %s %s" % (concept_month.name, int(num1.number), int(num2.number)), _type="DATE")
+                    self.add_interpretation(before + [time] + after)
+            
     def _4gram_file(self, _4gram, before, after):
         file_concept, file_name_concept, punc, csv = tuple(_4gram)
         new_concept, created = Concept.objects.get_or_create(
@@ -694,6 +737,14 @@ class Interpreter():
         self.add_interpretation(before + [verb, c2] + after)
         self.add_interpretation(before + [verb, c3] + after)
 
+    def _4gram_date(self, _4gram, before, after):
+        prep_on, c1_month, number_day, number_year = _4gram
+        if c1_month.name in self.time_mgr.month_names:
+            if number_day.number <= 31:
+                date = Time("%s %s %s" % (c1_month.name, int(number_day.number), int(number_year.number)), _type="DATE")
+                self.add_item(date)
+                self.add_interpretation(before + [prep_on, date] + after)
+
     def _5gram_small_list_3(self, _5gram, before, after):
         concept1, punc, concept2, sw, concept3 = _5gram
         _list = List([concept1, concept2, concept3])
@@ -716,6 +767,14 @@ class Interpreter():
     def _5gram_by(self, _5gram, before, after):
         c1, sw1, verb, sw2, c2 = _5gram
         self.add_interpretation(before + [c2, verb, c1] + after)
+
+    def _5gram_date(self, _5gram, before, after):
+        prep_on, c1_month, number_day, punc, number_year = _5gram
+        if c1_month.name in self.time_mgr.month_names:
+            if number_day.number <= 31:
+                date = Time("%s %s %s" % (c1_month.name, int(number_day.number), int(number_year.number)), _type="DATE")
+                self.add_item(date)
+                self.add_interpretation(before + [prep_on, date] + after)
 
     def _5gram_break_complex_verb(self, _5gram, before, after):
         verb, prep1, c1, prep2, c2 = _5gram
