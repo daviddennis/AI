@@ -198,7 +198,8 @@ class Verb(models.Model):
     name = models.CharField(max_length=500)
     past_name = models.CharField(max_length=500, null=True, blank=True)
     participle_name = models.CharField(max_length=100, null=True, blank=True)
-    
+    s_form = models.CharField(max_length=100, null=True, blank=True)
+
     form = None
 
     def __unicode__(self):
@@ -208,6 +209,8 @@ class Verb(models.Model):
                 return "%s" % (self.past_name)
             elif form == 'participle':
                 return "%s" % (self.participle_name)
+            elif form == 's':
+                return self.s_form
             else:
                 return "%s" % (self.name)
         else:
@@ -241,6 +244,7 @@ class VerbConstruct(models.Model):
     assertion2 = models.ForeignKey(Adjective, related_name="vc_adj_2_set", null=True, blank=True)
     question_fragment2 = models.ForeignKey('QuestionFragment', related_name="qf_2_set", null=True, blank=True)
     verb_construct2 = models.ForeignKey('self', related_name='vc_2_set', null=True, blank=True)
+    property2 = models.ForeignKey('Property', related_name='vc_prop_2_set', null=True, blank=True)
 
     context = models.ForeignKey(Context, related_name="verb_context_set", null=True, blank=True)
 
@@ -252,7 +256,7 @@ class VerbConstruct(models.Model):
 
     @property
     def arg2(self):
-        return self.concept2 or self.amount2 or self.assertion2 or self.question_fragment2 or self.verb_construct2
+        return self.concept2 or self.amount2 or self.assertion2 or self.question_fragment2 or self.verb_construct2 or self.property2
 
     def pre_save(self):
         if self.verb:
@@ -267,19 +271,17 @@ class VerbConstruct(models.Model):
         elif self.complex_verb:
             verb_name = str(self.complex_verb)
 
-        item1 = self.concept1 or self.amount1 #or self.assertion1
+        item1 = self.arg1
+        item2 = self.arg2
 
-        if item1 and self.concept2:
-            output = "%s(%s, %s)" % (verb_name, item1, self.concept2.name)
-        else:
-            if self.amount2:
-                output = "%s(%s, %s)" % (verb_name, item1, self.amount2)
+        if item1:
+            if item2:
+                output = "%s(%s, %s)" % (verb_name, item1, item2)
             else:
-                if self.verb_construct2:
-                    output = "%s(%s, %s)" % (verb_name, item1, self.verb_construct2)
-                else:
-                    output = "%s(%s)" % (verb_name, (item1 or self.concept2).name)
-
+                output = "%s(%s,)" % (verb_name, item1)
+        else:
+            output = "%s(,%s)" % (verb_name, item2)
+            
         if self.time:
             output += ' @ %s' % self.time
 
@@ -420,6 +422,20 @@ class Time():
     def __init__(self, name, _type=None):
         self.name = name
         self.type = _type
+        
+        self.month = None
+        self.day = None
+        self.year =  None
+
+        if self.type == "DATE":
+            tokens = self.name.split(' ')
+            if len(tokens) == 2:
+                self.month = tokens[0]
+                self.day = tokens[1]
+
+    def add_year(self, year):
+        self.year = year
+        self.name += " %s" % (year)
 
     def __repr__(self):
         if self.type:
@@ -474,3 +490,17 @@ class List():
             return 'List: %s' % self.items
 
 
+
+
+        # item1 = self.concept1 or self.amount1 #or self.assertion1
+
+        # if item1 and self.concept2:
+        #     output = "%s(%s, %s)" % (verb_name, item1, self.concept2.name)
+        # else:
+        #     if self.amount2:
+        #         output = "%s(%s, %s)" % (verb_name, item1, self.amount2)
+        #     else:
+        #         if self.verb_construct2:
+        #             output = "%s(%s, %s)" % (verb_name, item1, self.verb_construct2)
+        #         else:
+        #             output = "%s(%s)" % (verb_name, (item1 or self.concept2).name)

@@ -153,6 +153,8 @@ class Interpreter():
                 self.bigram_year(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT NUMBER"):
                 self.bigram_small_date(bigram, before, after)
+            if self.pr.recognize(bigram, "TIME NUMBER"):
+                self.bigram_date_year(bigram, before, after)
 
 
     def interpret_trigrams(self, parsed_sentence):
@@ -568,6 +570,12 @@ class Interpreter():
             elif self.time_mgr.is_year(num1):
                 time = Time("%s %s" % (c1_month.name, int(num1.number)), _type="DATE")
                 self.add_interpretation(before + [time] + after)                
+
+    def bigram_date_year(self, bigram, before, after):
+        time, num1 = bigram
+        if time.type == "DATE" and not time.year:
+            time.add_year(int(num1.number))
+            self.add_interpretation(before + [time] + after)
 
     def trigram_verb_construct(self, trigram, before, after):
         c1, v1, c2 = trigram

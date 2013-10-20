@@ -8,6 +8,7 @@ from wikipedia.lib.causation import CausationManager
 from wikipedia.lib.thought_processor import ThoughtProcessor
 from wikipedia.lib.medium_thought_processor import MediumThoughtProcessor
 from wikipedia.lib.word_mgr import WordManager
+from wikipedia.lib.query_processor import QueryProcessor
 from wikipedia.lib.question_asker import QuestionAsker
 from wikipedia.lib.auto_translate import translations
 from sys import stdout
@@ -28,6 +29,7 @@ class Command(BaseCommand):
         self.word_mgr = WordManager()
         interpreter = Interpreter()
         query_mgr = QueryManager()
+        query_processor = QueryProcessor()
         nlp_generator =  NLPGenerator()
         causation = CausationManager()
         thought_processor = ThoughtProcessor()
@@ -78,7 +80,8 @@ class Command(BaseCommand):
             interpretations = interpreter.interpret(parsed_sentence, thinker=self)
             interpreter.clear_interpretations()
 
-            print interpreter.one_item
+            if interpreter.one_item:
+                print interpreter.one_item
 
             num_interpretations = len(interpretations)
             print '# interpretations: %s' % num_interpretations
@@ -106,8 +109,15 @@ class Command(BaseCommand):
                 for thought in thoughts[:100]:
                     #if isinstance(thought[0], Category):
                     print thought
+                medium_thoughts = []
                 for thought in thoughts:
                     medium_thought_processor.process_thought(thought, thinker=self)
+                    medium_thoughts += medium_thought_processor.interpretations
+                    medium_thought_processor.interpretations = []
+                if medium_thoughts:
+                    print '----'*5 + ' THIRD LEVEL'
+                    for x in medium_thoughts[:100]:
+                        print x
 
                 print '----'*5
                 for key, val in medium_thought_processor.learned.iteritems():
@@ -118,6 +128,17 @@ class Command(BaseCommand):
                 shortest_interpretations += thoughts
 
             print '\n\n'
+
+            # Question Analysis
+            for potential_question in interpretations + thoughts:
+                query_processor.process_thought(potential_question)
+            if query_processor.learned:
+                print '----'*5 + ' QUESTION ANALYSIS LEVEL'
+                for key, val in query_processor.learned.iteritems():
+                    print key,':',val
+            query_processor.learned = {}
+
+            print '\n'
 
             #for x in sorted(shortest_interpretations, key=len)[:10]:
             #    print x

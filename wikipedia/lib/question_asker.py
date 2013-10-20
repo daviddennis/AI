@@ -13,13 +13,15 @@ class QuestionAsker():
         have_question = False
         question_parse = None
         logical_path = []
-        path_vc = []
+        q_path = []
 
         for item in items:
             if isinstance(item, Category):
                 logical_path = [item]
                 child = item.child
                 parent = item.parent
+
+                # Parent-child questions
                 verb_constructs = VerbConstruct.objects.filter(concept1=parent).all()
                 if verb_constructs:
                     for vc in verb_constructs:
@@ -35,7 +37,7 @@ class QuestionAsker():
                             verb=vc.verb,
                             concept2=vc.concept2).count():
 
-                            path_vc = [vc]
+                            q_path = [vc]
                             answer = {
                                 "type": "question",
                                 "sentence": [hypothetical_vc]
@@ -45,6 +47,29 @@ class QuestionAsker():
                             question['nlp_sentence'] = question_sentence
 
                             have_question = True
+
+
+        if not have_question:
+
+            for item in items:
+                if isinstance(item, Category):
+                    logical_path = [item]
+                    child = item.child
+                    parent = item.parent
+
+                    categories = Category.objects.filter(child=child).all()
+                    if not categories:
+                        what_is_a = StopwordSequence.objects.get(string="WHAT IS A")
+                        answer = {
+                            "type": "question",
+                            "sentence": [what_is_a, parent]
+                            }
+                        #question_parse, question_sentence = self.nlp_generator.process_question(answer)
+                        question = self.query_mgr.construct_query(question_parse)
+                        question['nlp_sentence'] = question_sentence
+
+                        have_question = True                        
+
 
         if have_question:
             question['logical_path'] = logical_path + path_vc

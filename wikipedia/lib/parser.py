@@ -204,6 +204,12 @@ class Parser():
                                 if verb_or_none:
                                     verb = verb_or_none
                                     verb.form = 'participle'
+                                    verb_or_none = get_object_or_None(Verb, participle_name=tokens[0])
+                                else:
+                                    verb_or_none = get_object_or_None(Verb, s_form=tokens[0])
+                                    if verb_or_none:
+                                        verb = verb_or_none
+                                        verb.form = 's'
         else:
             verb_or_none = get_object_or_None(Verb, past_name=tokens[0])
             if verb_or_none:

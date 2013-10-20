@@ -11,6 +11,7 @@ class MediumThoughtProcessor():
         self.thinker = None
         self.word_mgr = WordManager()
         self.pr = PatternRecognizer()
+        self.interpretations = []
         self.learned = {}
         
     def process_thought(self, parsed_sentence, thinker=None):
@@ -40,6 +41,8 @@ class MediumThoughtProcessor():
             after = parsed_sentence[i+2:]
             if self.pr.recognize(bigram, "PROPERTY AMOUNT"):
                 self.bigram_prop_amt(bigram, before, after)
+            if self.pr.recognize(bigram, "CONCEPT VERBCONSTRUCT"):
+                self.bigram_c_vc(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence,
@@ -77,6 +80,10 @@ class MediumThoughtProcessor():
                 self.trigram_cprep_isa_ass(trigram, before, after)
             if self.pr.recognize(trigram, "VERBCONSTRUCT PREP CONCEPT"):
                 self.trigram_vc_prep_c(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY SW:that VERBCONSTRUCT"):
+                self.trigram_ca_that_vc(trigram, before, after)
+            if self.pr.recognize(trigram, "VERB SW:the PROPERTY"):
+                self.trigram_verb_the_prop(trigram, before, after)
 
 
     def process_4grams(self, parsed_sentence):
@@ -101,6 +108,8 @@ class MediumThoughtProcessor():
                self._4gram_cvc(_4gram, before, after)
             if self.pr.recognize(_4gram, "ASSERTION SW:can VERB CONCEPT"):
                self._4gram_can(_4gram, before, after)
+            if self.pr.recognize(_4gram, "AMOUNT SW:in SW CONCEPT"):
+                self._4gram_amount_group(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CATEGORY SW:because ASSERTION"):
             #    print _4gram,'!!!!\n\n\n'
 
@@ -124,6 +133,7 @@ class MediumThoughtProcessor():
                 parent_concept=_property.parent,
                 child_concept=self.word_mgr.get_singular_concept(_property.key_concept))
             self.add_item(group)
+            self.reinterpret(before + [group] + after)
 
     def bigram_prop_amt(self, bigram, before, after):
         prop, amount = bigram
@@ -131,13 +141,22 @@ class MediumThoughtProcessor():
         prop.save()
         self.add_item(prop)
 
+    def bigram_c_vc(self, bigram, before, after):
+        c1, vc = bigram
+        if not vc.arg1:
+            vc.concept1 = c1
+            vc.save()
+            self.add_item(vc)
+            self.reinterpret(before + [vc] + after)
+
     def trigram_group(self, trigram, before, after):
         c1, sws, group = trigram
         group_instance, created = GroupInstance.objects.get_or_create(
             group=group,
             parent_concept=group.parent_concept,
             child_concept=c1)
-        self.add_item(group_instance)        
+        self.add_item(group_instance)
+        self.reinterpret(before + [group_instance] + after)
 
     def trigram_ca_ass_group(self, trigram, before, after):
         category, sw, assertion = trigram
@@ -165,6 +184,7 @@ class MediumThoughtProcessor():
                 parent_concept=c2,
                 child_concept=c1)
             self.add_item(group_instance)
+            self.reinterpret(before + [group_instance] + after)
 
     def trigram_cverb(self, trigram, before, after):
         amount, cverb, concept = trigram
@@ -173,6 +193,7 @@ class MediumThoughtProcessor():
             complex_verb=cverb,
             concept2=concept)
         self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def trigram_ca_cverb_c(self, trigram, before, after):
         category, cverb, concept = trigram
@@ -181,6 +202,7 @@ class MediumThoughtProcessor():
             complex_verb=cverb,
             concept2=concept)
         self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def trigram_cverb_ca(self, trigram, before, after):
         concept, cverb, amount = trigram
@@ -189,6 +211,7 @@ class MediumThoughtProcessor():
             complex_verb=cverb,
             amount2=amount)
         self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def trigram_property(self, trigram, before, after):
         prop, sw, c1 = trigram
@@ -221,6 +244,7 @@ class MediumThoughtProcessor():
             preposition=prep,
             concept2=prop2.key_concept)
         self.add_item(pc)
+        self.reinterpret(before + [pc] + after)
 
     def trigram_cprep_isa_ass(self, trigram, before, after):
         cprep, sws_isa, assertion = trigram
@@ -245,6 +269,34 @@ class MediumThoughtProcessor():
             preposition=prep,
             concept2=concept)
         self.add_item(prep_construct)
+        self.reinterpret(before + [prep_construct] + after)
+
+    def trigram_ca_that_vc(self, trigram, before, after):
+        ca, sw, vc = trigram
+        if not vc.arg1:
+            verb_construct, created = VerbConstruct.objects.get_or_create(
+                concept1=ca.child,
+                verb=vc.verb,
+                complex_verb=vc.complex_verb,
+                concept2=vc.concept2,
+                amount2=vc.amount2,
+                assertion2=vc.assertion2,
+                question_fragment2=vc.question_fragment2,
+                verb_construct2=vc.verb_construct2,
+                property2=vc.property2)
+            self.add_item(verb_construct)
+            self.reinterpret(before + [verb_construct] + after)
+
+
+    def trigram_verb_the_prop(self, trigram, before, after):
+        verb, sw_the, _property = trigram
+        verb_construct, created = VerbConstruct.objects.get_or_create(
+            concept1=None,
+            amount1=None,
+            verb=verb,
+            property2=_property)
+        self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram
@@ -253,6 +305,7 @@ class MediumThoughtProcessor():
             complex_verb=cverb,
             concept2=c2)
         self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def _4gram_category_group(self, _4gram, before, after):
         category, prep, sw, concept = _4gram
@@ -285,7 +338,7 @@ class MediumThoughtProcessor():
             concept2=None,
             time=time_name)
         self.add_item(verb_construct)
-        #self.reinterpret(before + [verb_construct] + after)
+        self.reinterpret(before + [verb_construct] + after)
 
     def _4gram_cvc(self, _4gram, before, after):
         c1, cverb, sw_the, c2 = _4gram
@@ -294,6 +347,7 @@ class MediumThoughtProcessor():
             complex_verb=cverb,
             concept2=c2)
         self.add_item(verb_construct)
+        self.reinterpret(before + [verb_construct] + after)
 
     def _4gram_can(self, _4gram, before, after):
         ass, sw_can, verb, concept = _4gram
@@ -307,6 +361,15 @@ class MediumThoughtProcessor():
             vc2=verb_construct)
         self.add_item(if_stmt)
 
+    def _4gram_amount_group(self, _4gram, before, after):
+        amount, sw1_in, sw2, c = _4gram
+        group, created = Group.objects.get_or_create(
+            parent_concept=c,
+            child_concept=amount.concept or amount.unit,
+            size=amount.number)
+        self.add_item(group)
+        self.reinterpret(before + [group] + after)
+
     def _5gram_group(self, _5gram, before, after):
         concept, sw, number, sws, group = _5gram
         group_instance, created = GroupInstance.objects.get_or_create(
@@ -314,9 +377,46 @@ class MediumThoughtProcessor():
             parent_concept=group.parent_concept,
             child_concept=concept)
         self.add_item(group_instance)
+        self.reinterpret(before + [group_instance] + after)
 
     def add_item(self, item):
         key_name = item.__class__.__name__.lower() + 's'
         self.learned[key_name] = self.learned.get(key_name, [])
         if item not in self.learned.get(key_name, []):
             self.learned[key_name] += [item]
+
+    def reinterpret(self, interpretation):
+        interpretation_size = len(interpretation)
+        should_add = True
+        for existing_interpretation in self.interpretations:
+            same = True
+            if len(existing_interpretation) == interpretation_size:
+                for i, item in enumerate(existing_interpretation):
+                    if self.word_mgr.is_model(item):
+                        if item != interpretation[i]:
+                            same = False
+                            break
+                    else:
+                        if not self.word_mgr.equals(item, interpretation[i]):
+                            same = False
+                            break
+            else:
+                same = False
+
+            if same:
+                should_add = False
+                break
+            # else:
+            #     try:
+            #         print existing_interpretation[0].id,existing_interpretation[0],existing_interpretation
+            #         print interpretation[0].id,interpretation[0],interpretation
+            #         print '!!!'
+            #     except:
+            #         pass
+
+        if should_add:
+            self.interpretations += [interpretation]
+            self.process_thought(interpretation)
+                
+    
+                

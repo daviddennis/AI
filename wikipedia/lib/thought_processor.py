@@ -14,16 +14,6 @@ class ThoughtProcessor():
         self.pr = PatternRecognizer()
         self.word_mgr = WordManager()
         self.learned = {}
-            # 'assertions': [],
-            # 'categories': [],
-            # 'concepts': [],
-            # 'verbs': [],
-            # 'verb constructs': [],
-            # 'if statements': [],
-            # 'groups': [],
-            # 'group instances': [],
-            # 'aliases': []
-            # }
         self.interpretations = []
 
     def process_thought(self, parsed_sentence, thinker=None):
@@ -112,6 +102,10 @@ class ThoughtProcessor():
                 self.bigram_quantifer(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
                 self.bigram_cc(bigram, before, after)
+            if self.pr.recognize(bigram, "CONCEPT VERB"):
+                self.bigram_c_v(bigram, before, after)
+            #if self.pr.recognize(bigram, "CONCEPT VERBCONSTRUCT"):
+            #    self.bigram_c_vc(bigram, before, after)
             if self.pr.recognize(bigram, "TIME VERBCONSTRUCT"):
                 self.bigram_time_vc(bigram, before, after)
             if self.pr.recognize(bigram, "PUNC:$ NUMBER"):
@@ -152,6 +146,8 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT VERB:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(trigram, "CONCEPT SW:and CONCEPT"):
+                self.trigram_c_and_c(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT PREP CONCEPT"):
                 self.process_prepconstruct(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_not ADJECTIVE"):
@@ -184,6 +180,8 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT SWS:is_a CONCEPT"):
                 result = self.process_is_a(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(trigram, "CONCEPT SWS:is_the CONCEPT"):
+                self.process_c_isthe_c(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:is_not_a CONCEPT"):
                 result = self.process_is_not_a(item_group, before, after)
                 output += [result]
@@ -245,6 +243,8 @@ class ThoughtProcessor():
                 self.process_4gram_property_had(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT SW:or CONCEPT SWS:is_a"):
                 self.process_4gram_alias(_4gram, before, after)
+            #if self.pr.recognize(_4gram, "CONCEPT VERB SW:the LIST"):
+            #    self._4gram_vc_list(_4gram, before, after)
 
 
         if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
@@ -409,11 +409,11 @@ class ThoughtProcessor():
 
     def process_unigram_money(self, item, before, after):
         money = item
-        number = Number(money.number)
+        dollar_concept = get_object_or_None(Concept, name="DOLLAR")
         amount, created = Amount.objects.get_or_create(
-            number=number,
-            concept=get_object_or_None(Concept, name="DOLLAR"))
-        self.add_interpretation(before + [amount] + after)
+            number=money.number.number,
+            concept=dollar_concept)
+        self.reinterpret(before + [amount] + after)
 
     def process_bigram_names(self, bigram, before, after):
         n1, n2 = bigram
@@ -481,7 +481,29 @@ class ThoughtProcessor():
                 if new_c:
                     self.reinterpret(before + [new_c] + after)
 
+    def bigram_c_vc(self, bigram, before, after):
+        c, vc = bigram
+        if not vc.arg1:
+            vc.concept1 = c
+            vc.save()
+            self.add_item(vc)
+            self.reinterpret(before + [vc] + after)
         
+    def bigram_c_v(self, bigram, before, after):
+        c, v = bigram
+        vc, created = VerbConstruct.objects.get_or_create(
+            concept1=c,
+            verb=v,
+            complex_verb=None,
+            concept2=None,
+            amount2=None,
+            assertion2=None,
+            question_fragment2=None,
+            verb_construct2=None,
+            property2=None)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
     def bigram_time_vc(self, bigram, before, after):
         time, vc = bigram
         vc.time = time.name
@@ -611,6 +633,12 @@ class ThoughtProcessor():
         self.add_item(alias)
         self.reinterpret(before + [c1, sws_isa] + after)
         self.reinterpret(before + [c2, sws_isa] + after)
+
+    def _4gram_vc_list(self, _4gram, before, after):
+        c1, v, sw_the, _list = _4gram
+        for item in _list.items:
+            if isinstance(item, Concept):
+                self.reinterpret(before + [c1, v, item] + after)
 
     def process_apostrophe(self, parsed_sentence):
         concept1, punc, sw, concept2 = tuple(parsed_sentence[:4])
@@ -759,7 +787,7 @@ class ThoughtProcessor():
         self.reinterpret(before + [_property] + after)
 
     def process_category_adj(self, parsed_sentence):
-        c1, sws, adj, c2 = parsed_sentence
+        c1, sws, adj, c2 = parsed_sentence[:4]
         category, created = Category.objects.get_or_create(
             parent=c2,
             child=c1)
@@ -1070,6 +1098,11 @@ class ThoughtProcessor():
             concept2=c2)
         self.add_assertion(assertion)
 
+    def trigram_c_and_c(self, trigram, before, after):
+        c1, sw_and, c2 = trigram
+        self.reinterpret(before + [c1] + after)
+        self.reinterpret(before + [c2] + after)
+
     def process_prepconstruct(self, trigram, before, after):
         c1, prep, c2 = trigram
         prep_construct, created = PrepConstruct.objects.get_or_create(
@@ -1122,6 +1155,16 @@ class ThoughtProcessor():
             self.add_item(v)
 
         return new_category
+
+
+    def process_c_isthe_c(self, trigram, before, after):
+        c1, sws, c2 = trigram
+        ca, created = Category.objects.get_or_create(
+            parent=c2,
+            child=c1)
+        self.add_item(ca)
+        self.reinterpret(before + [ca] + after)
+
 
     def process_is_not_a(self, triple, before, after):
         c1, sws, c2 = triple
@@ -1188,6 +1231,8 @@ class ThoughtProcessor():
             verb=verb,
             concept2=concept2,
             context=self.get_context())
+        #            print concept1,verb,concept2,'!!!'
+        #            sys.exit()
         self.add_verb_construct(verb_construct)
         return verb_construct
 

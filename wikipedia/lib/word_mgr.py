@@ -216,3 +216,19 @@ class WordManager():
                 continue
 
         return verbs
+
+    def is_model(self, item):
+        if hasattr(item, '__class__'):
+            if hasattr(item.__class__, '__class__'):
+                if item.__class__.__class__.__name__ == 'ModelBase':
+                    return True
+        return False
+
+    def equals(self, item1, item2):
+        if item1.__class__ == item2.__class__:
+            try:
+                same = item1.name == item2.name
+                return same
+            except:
+                pass
+        return False

@@ -13,6 +13,7 @@ class QueryManager():
         self.verify_words = ['CAN', 'DO', 'DID', 'IS']
         self.w_words += self.verify_words
 
+
     def is_query(self, latest):
         if len(latest) <= 1:
             return False
