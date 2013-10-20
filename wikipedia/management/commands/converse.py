@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 from wikipedia.models import *
-from wikipedia.lib.parser import Parser, Stopword
+from wikipedia.lib.parser import Parser
 from wikipedia.lib.interpreter import Interpreter
 from wikipedia.lib.query_mgr import QueryManager
 from wikipedia.lib.nlp_gen import NLPGenerator

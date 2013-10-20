@@ -3,10 +3,10 @@ from wikipedia.lib.parser import Parser
 from annoying.functions import get_object_or_None
 from wikipedia.models import *
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet
 
 class WordManager():
     
-
     def __init__(self):
         self.parser = Parser()
         self.stop_words = set([x.upper() for x in stopwords.words('english') if x not in ('have', 'had')])
@@ -192,3 +192,27 @@ class WordManager():
             return get_object_or_None(Verb, past_name=verb_func(item.name.lower()))
         except:
             return get_object_or_None(Verb, past_name=verb_func(item.string.lower()))
+
+    def get_verb_syns(self, verb, size=None):
+        verb_syns = list(set([lemma.name for lemma in sum([ss.lemmas for ss in wordnet.synsets(verb.name, wordnet.VERB)],[])] ))
+        verbs = []
+        for verb_syn in verb_syns:
+            if size:
+                if len(verbs) >= size:
+                    break
+            if '_' in verb_syn:
+                continue
+            verb_or_none = get_object_or_None(Verb, name=verb_syn)
+            if verb_or_none:
+                verbs += [verb_or_none]
+                continue
+            verb_or_none = get_object_or_None(Verb, past_name=verb_syn)
+            if verb_or_none:
+                verbs += [verb_or_none]
+                continue
+            verb_or_none = get_object_or_None(Verb, participle_name=verb_syn)
+            if verb_or_none:
+                verbs += [verb_or_none]
+                continue
+
+        return verbs

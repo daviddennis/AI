@@ -1,5 +1,5 @@
 from nltk.stem.wordnet import WordNetLemmatizer
-from wikipedia.lib.parser import Parser, Stopword
+from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.group_manager import GroupManager
 from wikipedia.lib.word_mgr import WordManager
@@ -334,6 +334,8 @@ class Interpreter():
             concept_or_none = get_object_or_None(Concept, name=verb.participle_name)
             if concept_or_none:
                 self.add_interpretation(before + [concept_or_none] + after)
+        #for verb_syn in self.word_mgr.get_verb_syns(verb, size=3):
+        #    self.add_interpretation(before + [verb_syn] + after, recurse=False)
 
     def unigram_are_a(self, unigram, before, after):
         sws = unigram
@@ -937,8 +939,9 @@ class Interpreter():
         if len(self.interpretations) > 5000:
             self.print_once("> 5000 interpretations")
             return
-        #if interpretation not in self.interpretations:
-        #    self.interpretations += [interpretation]
+        else:
+            if interpretation not in self.interpretations:
+                self.interpretations += [interpretation]
         if recurse:
             self.interpret(interpretation)
 

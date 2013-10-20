@@ -1,5 +1,4 @@
 from wikipedia.models import *
-from wikipedia.lib.parser import Stopword
 
 class PatternRecognizer():
     
@@ -127,6 +126,9 @@ class PatternRecognizer():
                     return False
             if arg.startswith("CPREP"):
                 if not isinstance(item, PrepConstruct):
+                    return False
+            if arg.startswith("MONEY"):
+                if not isinstance(item, Money):
                     return False
             if arg in ("Q", "QUANTIFIER"):
                 if not isinstance(item, Quantifier):

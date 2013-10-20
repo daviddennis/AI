@@ -1,5 +1,5 @@
 from nltk.stem.wordnet import WordNetLemmatizer
-from wikipedia.lib.parser import Parser, Stopword
+from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.models import *
@@ -86,6 +86,8 @@ class ThoughtProcessor():
                 self.process_unigram_concept(item, before, after)
             if self.pr.recognize([item], "ASSERTION"):
                 self.process_unigram_assertion(item, before, after)
+            if self.pr.recognize([item], "MONEY"):
+                self.process_unigram_money(item, before, after)
 
     def process_bigrams(self, parsed_sentence):
         bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
@@ -404,6 +406,14 @@ class ThoughtProcessor():
 
     def process_unigram_assertion(self, ass, before, after):
         self.reinterpret(before + [ass.concept1] + after)
+
+    def process_unigram_money(self, item, before, after):
+        money = item
+        number = Number(money.number)
+        amount, created = Amount.objects.get_or_create(
+            number=number,
+            concept=get_object_or_None(Concept, name="DOLLAR"))
+        self.add_interpretation(before + [amount] + after)
 
     def process_bigram_names(self, bigram, before, after):
         n1, n2 = bigram

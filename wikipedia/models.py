@@ -177,6 +177,7 @@ class Amount(models.Model):
     unit = models.ForeignKey(Concept, related_name="unit_set", null=True, blank=True)
 
     def __unicode__(self):
+
         if self.number:
             if self.unit:
                 return "%d %s of %s" % (self.number, self.unit, self.concept)
@@ -431,6 +432,7 @@ class Money():
     def __init__(self, name, sign="$"):
         self.name = name
         self.sign = sign
+        self.number = Number(name)
         
     def __repr__(self):
         return "Money: %s %s" % (self.sign, "{:,.2f}".format(float(self.name)))
@@ -456,22 +458,7 @@ class List():
                 the_category = self.items[0].category_set.all()[0].parent
             except:
                 the_category = self.items[0]
-        # category_list = self.items[0].category_set.all()
-        # for category in category_list:
-        #     for item in self.items[1:]:
-        #         if category not in item.category_set.all():
-        #             continue
-        #     the_category = category
-        # print the_category,'!!!'
         self.type = the_category
-        #for item in self.items[1:]:
-        #    for category in item.category_set.all():
-        #        if category not in category_list:
-                    
-    #     d = {}
-    #     for item in self.items:
-    #         for category_id in [c.id for c in item.category_set.all()]:
-    #             d[category_id] = d.get(category_id, 0)
             
 
     # def __getitem__(self,index):

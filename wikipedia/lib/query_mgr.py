@@ -1,5 +1,5 @@
 import sys
-from wikipedia.models import StopwordSequence, Concept, Assertion, Stopword, Punctuation, Verb
+from wikipedia.models import *
 from nltk.stem.wordnet import WordNetLemmatizer
 from annoying.functions import get_object_or_None
 
