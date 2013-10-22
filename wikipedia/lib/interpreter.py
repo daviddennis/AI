@@ -121,8 +121,8 @@ class Interpreter():
             after = parsed_sentence[i+2:]
             if self.pr.recognize(bigram, "Q CONCEPT"):
                 self.bigram_q_concept(bigram, before, after)
-            if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
-                self.bigram_adj_c(bigram, before, after)
+            #if self.pr.recognize(bigram, "CONCEPT CONCEPT"):
+            #    self.bigram_adj_c(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT:type SW:of"):
                 self.bigram_type_of(bigram, before, after)
             if self.pr.recognize(bigram, "SW:the CONCEPT"):
@@ -374,13 +374,15 @@ class Interpreter():
         #     name_or_none, created = PersonName.objects.get_or_create(name=concept.name)
         # if name_or_none:
         #     self.add_interpretation(before + [name_or_none] + after)
-        adj_or_none = get_object_or_None(Adjective, name=concept.name)
-        if adj_or_none:
-            self.add_interpretation(before + [adj_or_none] + after)
-        else:
-            adj_or_none = get_object_or_None(Adjective, superlative=concept.name) 
-            if adj_or_none:
-                self.add_interpretation(before + [adj_or_none] + after)       
+
+        # adj_or_none = get_object_or_None(Adjective, name=concept.name)
+        # if adj_or_none:
+        #     self.add_interpretation(before + [adj_or_none] + after)
+        # else:
+        #     adj_or_none = get_object_or_None(Adjective, superlative=concept.name) 
+        #     if adj_or_none:
+        #         self.add_interpretation(before + [adj_or_none] + after)       
+
         #verb_or_none = get_object_or_None(Verb, name=concept.name)
         #if verb_or_none:
         #    self.add_interpretation(before + [verb_or_none] + after)

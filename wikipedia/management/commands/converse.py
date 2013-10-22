@@ -68,6 +68,7 @@ class Command(BaseCommand):
 
             if self.en:
                 tags = [(word.upper(), pos_tag) for word, pos_tag in self.en.sentence.tag(text)]
+                print tags
             else:
                 tags = None
             
@@ -214,9 +215,11 @@ class Command(BaseCommand):
         elif isinstance(item, Amount):
             keys += [item.concept.name]
             keys += ["AMOUNT"]
+            keys += ["THEM"]
         elif isinstance(item, List):
             keys += [item.type.name]
             keys += ["LIST"]
+            keys += ["THEM"]
         elif isinstance(item, Group):
             keys += [item.child_concept.name]
             keys += ["GROUP"]
@@ -234,11 +237,15 @@ class Command(BaseCommand):
         if isinstance(item, Stopword):
             return self.computer_mind.get(item.name)
         if isinstance(item, Concept):
-            for word_form in self.word_mgr.get_forms(item):
-                #print word_form
-                recalled_item = self.computer_mind.get(word_form)
-                if recalled_item:
-                    return recalled_item
+            recalled_item = self.computer_mind.get(item.name)
+            if recalled_item:
+                return recalled_item
+            
+        #    for word_form in self.word_mgr.get_forms(item):
+        #        #print word_form
+        #        recalled_item = self.computer_mind.get(word_form)
+        #        if recalled_item:
+        #            return recalled_item
     
     def add_thought(self, thought):
         self.my_mind[thought[0].name] = thought[1]

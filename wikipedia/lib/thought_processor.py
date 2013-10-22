@@ -3,6 +3,7 @@ from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.models import *
+from django.db.models.loading import get_model
 import operator
 import sys
 from annoying.functions import get_object_or_None
@@ -94,6 +95,8 @@ class ThoughtProcessor():
                 self.process_bigram_question_fragment(bigram, before, after)
             if self.pr.recognize(bigram, "VERB PREP"):
                 self.process_bigram_complex_verb(bigram, before, after)
+            if self.pr.recognize(bigram, "VERBCONSTRUCT PREP"):
+                self.bigram_vc_prep(bigram, before, after)
             if self.pr.recognize(bigram, "AMOUNT CONCEPT"):
                 self.process_bigram_amount_unit(bigram, before, after)
             if self.pr.recognize(bigram, "ADJECTIVE CONCEPT"):
@@ -112,6 +115,8 @@ class ThoughtProcessor():
                 self.bigram_money(bigram, before, after)
             if self.pr.recognize(bigram, "NUMBER PUNC:%"):
                 self.bigram_percent(bigram, before, after)
+            if self.pr.recognize(bigram, "ADJ TIME"):
+                self.bigram_adj_time(bigram, before, after)
 
 
     def process_trigrams(self, parsed_sentence):
@@ -140,6 +145,9 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT SW:are ADJECTIVE"):
                 result = self.process_are_adj(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(item_group, "CONCEPT SW:is ADJECTIVE"):
+                result = self.process_are_adj(item_group, before, after)
+                output += [result]
             if self.pr.recognize(item_group, "CONCEPT SW:is CONCEPT"):
                 result = self.process_is(item_group, before, after)
                 output += [result]
@@ -148,6 +156,12 @@ class ThoughtProcessor():
                 output += [result]
             if self.pr.recognize(trigram, "CONCEPT SW:and CONCEPT"):
                 self.trigram_c_and_c(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT CONCEPT CONCEPT"):
+                self.trigram_ccc(trigram, before, after)
+            if self.pr.recognize(trigram, "... SWS:is_not_a ..."):
+                self.trigram_remove_obj(trigram, before, after)
+            if self.pr.recognize(trigram, "... SWS:is_not_an ..."):
+                self.trigram_remove_obj(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT PREP CONCEPT"):
                 self.process_prepconstruct(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_not ADJECTIVE"):
@@ -174,6 +188,12 @@ class ThoughtProcessor():
                 self.process_c_has_amount(trigram, before, after)
             if self.pr.recognize(item_group, 'NUMBER PUNC:, NUMBER'):
                 self.process_trigram_large_number(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SWS:is_a ADJECTIVE"):
+                self.trigram_c_isa_adj(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY SW:is CONCEPT"):
+                self.trigram_prop_value(trigram, before, after)
+            if self.pr.recognize(trigram, "ADJ SWS:is_a CONCEPT"):
+                self.trigram_adj_isa_c(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SW:on CONCEPT"):
                 result = self.process_on(item_group, before, after)
                 output += [result]
@@ -450,6 +470,12 @@ class ThoughtProcessor():
 
     def process_bigram_adj_c(self, bigram, before, after):
         adj, c1 = bigram
+        if Concept.objects.filter(name__like=adj.name+" "+c1.name+"%").all():
+            adj_to_c = get_object_or_None(Concept, name=adj.name)
+            if adj_to_c:
+                self.reinterpret(before + [adj_to_c, c1] + after)
+                return
+
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
@@ -522,6 +548,11 @@ class ThoughtProcessor():
         num1, punc = bigram
         self.reinterpret(before + [num1.number/100] + after)
 
+    def bigram_adj_time(self, bigram, before, after):
+        adj, time = bigram
+        time.add_adj(adj)
+        self.reinterpret(before + [time] + after)
+
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
         if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
@@ -538,6 +569,18 @@ class ThoughtProcessor():
             prep2=None)
         self.add_item(complex_verb)
         self.reinterpret(before + [complex_verb] + after)
+
+    def bigram_vc_prep(self, bigram, before, after):
+        vc, prep = bigram
+        if vc.verb:
+            complex_verb, created = ComplexVerb.objects.get_or_create(
+                verb=vc.verb,
+                preposition=prep)
+            vc.verb = None
+            vc.complex_verb = complex_verb
+            vc.save()
+            self.add_item(vc)
+            self.reinterpret(before + [vc] + after)
 
     def process_if(self, parsed_sentence):
         _if, item1, then, item2 = tuple(parsed_sentence)
@@ -1032,6 +1075,30 @@ class ThoughtProcessor():
             adj2=adj)
         self.reinterpret(before + [assertion] + after)
 
+    def trigram_c_isa_adj(self, trigram, before, after):
+        c1, sws, adj = trigram
+        relation = get_object_or_None(Relation, name="HasProperty")
+        assertion, created = Assertion.objects.get_or_create(
+            concept1=c1,
+            relation=relation,
+            concept2=None,
+            adj2=adj)
+        self.add_item(assertion)
+        self.reinterpret(before + [assertion] + after)
+
+    def trigram_prop_value(self, trigram, before, after):
+        prop, sw, c = trigram
+        prop.value_concept = c
+        prop.save()
+        self.add_item(prop)
+        self.reinterpret(before + [prop] + after)
+
+    def trigram_adj_isa_c(self, trigram, before, after):
+        adj, sws, c = trigram
+        c1 = get_object_or_None(Concept, name=adj.name)
+        if c1:
+            self.reinterpret(before + [c1, sws, c] + after)
+
     def process_on(self, triple, before, after):
         concept1, sw, concept2 = triple
         group, created = Group.objects.get_or_create(
@@ -1103,6 +1170,12 @@ class ThoughtProcessor():
         self.reinterpret(before + [c1] + after)
         self.reinterpret(before + [c2] + after)
 
+    def trigram_ccc(self, trigram, before, after):
+        c1, c2, c3 = trigram
+        new_c = get_object_or_None(Concept, name="%s %s %s" % (c1.name, c2.name, c3.name))
+        if new_c:
+            self.reinterpret(before + [new_c] + after)
+
     def process_prepconstruct(self, trigram, before, after):
         c1, prep, c2 = trigram
         prep_construct, created = PrepConstruct.objects.get_or_create(
@@ -1111,6 +1184,26 @@ class ThoughtProcessor():
             concept2=c2)
         self.add_item(prep_construct)
         self.reinterpret(before + [prep_construct] + after)
+
+    def trigram_remove_obj(self, trigram, before, after):
+        x1, sws, x2 = trigram
+
+        try:
+            item1_name = x1.name
+        except:
+            item1_name = x1.string
+
+        try:
+            item2_name = x2.name
+        except:
+            item2_name = x2.string
+
+        x2_cls = get_model('wikipedia', item2_name.capitalize())
+        
+        x2s = x2_cls.objects.filter(name=item1_name).all()
+        if x2s:
+            print "Removed %s from %ss" % (x2s[0], x2_cls.__name__)
+            x2s[0].delete()
 
     def process_isnot(self, trigram, before, after):
         c1, isnot, adj = trigram

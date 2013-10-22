@@ -72,7 +72,7 @@ class WordManager():
     def get_forms(self, item):
         if isinstance(item, Concept):
             item_name = item.name.lower()
-            print 'Loading en...'
+            print 'Loadingg en...'
             import en
             return [x.upper() for x in [en.noun.singular(item_name), en.noun.plural(item_name)]]
 

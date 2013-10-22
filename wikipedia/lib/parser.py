@@ -68,12 +68,12 @@ class Parser():
                                 #    before += [items[0]]
                                 #    remaining = items[1:]
                                 #else:
-                                items, success = self.parse_concept(item)
+                                items, success = self.parse_adjective(item, tags)
                                 if success:
                                     before += [items[0]]
                                     remaining = items[1:]
                                 else:
-                                    items, success = self.parse_adjective(item)
+                                    items, success = self.parse_concept(item)
                                     if success:
                                         before += [items[0]]
                                         remaining = items[1:]
@@ -171,8 +171,15 @@ class Parser():
         else:
             return ([item], False)
 
-    def parse_adjective(self, item):
-        tokens = self.tokenize(item)        
+    def parse_adjective(self, item, tags=None):
+        tokens = self.tokenize(item)
+
+        if tags:
+            for word, pos_tag in tags:
+                if 'NN' in pos_tag:
+                    if word == tokens[0]:
+                        return ([item], False)
+
         adjective = get_object_or_None(Adjective, superlative=tokens[0])
         if adjective:
             adjective.form = 'superlative'

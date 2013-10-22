@@ -72,7 +72,7 @@ class QuestionAsker():
 
 
         if have_question:
-            question['logical_path'] = logical_path + path_vc
+            question['logical_path'] = logical_path + q_path
             return question
 
     def answer_question(self, question=None, items=[]):

@@ -3,9 +3,108 @@ from wikipedia.models import *
 class PatternRecognizer():
     
     def __init__(self):
-        pass
+        self.model_dict = {
+            "STRING": str,
+            "VERB": Verb,
+            "CONCEPT": Concept,
+            "SWS": StopwordSequence,
+            "ADJ": Adjective,
+            "ADJECTIVE": Adjective,
+            "SW": Stopword,
+            "PUNC": Punctuation,
+            "NUMBER": Number,
+            "PREP": Preposition,
+            "PREPOSITION": Preposition,
+            "TIME": Time,
+            "AMOUNT": Amount,
+            "LIST": List,
+            "ASSERTION": Assertion,
+            "VERBCONSTRUCT": VerbConstruct,
+            "CATEGORY": Category,
+            "GROUP": Group,
+            "CVERB": ComplexVerb,
+            "PROP": Property,
+            "PROPERTY": Property,
+            "NAME": PersonName,
+            "CPREP": PrepConstruct,
+            "MONEY": Money,
+            "QUANTIFIER": Quantifier,
+            "Q": Quantifier
+            }
 
     def recognize(self, item_list, pattern):
+
+        args = pattern.split(' ')
+        for i, arg in enumerate(args):
+            arg = arg.strip().upper()
+            if i >= len(item_list):
+                if args[i:]:
+                    return False
+            item = item_list[i]
+
+            if arg == "...":
+                continue
+
+            if '|' in arg:
+
+                sub_args = arg.split('|')
+                matched = False
+                for sub_arg in sub_args:
+                    cls = self.model_dict.get(model_name)
+                    if cls:
+                        if isinstance(item, cls):
+                            matched = True
+                            break
+                if not matched:
+                    return False
+
+            else:
+
+                if ':' in arg:
+                    cls = self.model_dict.get(arg.split(':')[0])
+                else:
+                    cls = self.model_dict.get(arg)
+                if cls:
+                    if isinstance(item, cls):
+                        if ':' in arg:
+                            try:
+                                item_name = item.name
+                            except:
+                                item_name = item.string
+                            if item_name != ' '.join(arg.split(':')[1].split('_')):
+                                return False
+                    else:
+                        return False
+                else:
+                    raise Exception('Unknown model %s' % arg)
+        
+        return True
+
+                # for model_name in self.model_dict:
+                #     if arg.startswith(model_name):
+                #         cls = self.model_dict[model_name]
+                #         if isinstance(item, cls):
+                #             if ':' in arg:
+                #                 try:
+                #                     item_name = item.name
+                #                 except:
+                #                     item_name = item.string
+                #                 if item_name != arg.split(':')[1]:
+                #                     return False
+                #         else:
+                #             return False
+
+
+                                # if ':' in arg:
+                                #     try:
+                                #         item_name = item.name
+                                #     except:
+                                #         item_name = item.string
+                                #     if item_name == ' '.join(sub_arg.split(':')[1].split('_'))::
+                                #         num_matched += 1
+            
+
+    def old_recognize(self, item_list, pattern):
         #keep_looking = False
         args = pattern.split(' ')
         for i, arg in enumerate(args):

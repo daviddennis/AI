@@ -152,6 +152,7 @@ class Adjective(models.Model):
 
 class Assertion(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="assertion_1_set")
+    property1 = models.ForeignKey('Property', related_name="ass_prop_1_set", null=True, blank=True)
 
     relation = models.ForeignKey(Relation)
 
@@ -423,6 +424,8 @@ class Time():
         self.name = name
         self.type = _type
         
+        self.adj = None
+
         self.month = None
         self.day = None
         self.year =  None
@@ -432,6 +435,13 @@ class Time():
             if len(tokens) == 2:
                 self.month = tokens[0]
                 self.day = tokens[1]
+
+    def add_adj(self, adj):
+        if self.adj == None:
+            self.name = adj.name + " " + self.name 
+        else:
+            self.name = ' '.join(self.name.split(' ')[1:])
+        self.adj = adj
 
     def add_year(self, year):
         self.year = year
