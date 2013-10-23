@@ -725,7 +725,6 @@ class Interpreter():
 
     def _4gram_is_the(self, _4gram, before, after):
         concept1, sws, concept2, concept3 = _4gram
-        _4gram = list(_4gram)
         sws = get_object_or_None(StopwordSequence, string="is a".upper())
         self.add_interpretation(before + [concept1, sws, concept3] + after)
 

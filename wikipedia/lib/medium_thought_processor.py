@@ -82,6 +82,8 @@ class MediumThoughtProcessor():
                 self.trigram_vc_prep_c(trigram, before, after)
             if self.pr.recognize(trigram, "CATEGORY SW:that VERBCONSTRUCT"):
                 self.trigram_ca_that_vc(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY PREPOSITION:in CONCEPT"):
+                self.trigram_ca_prep_c(trigram, before, after)
             if self.pr.recognize(trigram, "VERB SW:the PROPERTY"):
                 self.trigram_verb_the_prop(trigram, before, after)
 
@@ -287,6 +289,20 @@ class MediumThoughtProcessor():
             self.add_item(verb_construct)
             self.reinterpret(before + [verb_construct] + after)
 
+
+    def trigram_ca_prep_c(self, trigram, before, after):
+        ca, prep, c1 = trigram
+        group, created = Group.objects.get_or_create(
+            parent_concept=c1,
+            child_concept=ca.parent)
+        self.add_item(group)
+        self.reinterpret(before + [group] + after)
+        group_instance, created = GroupInstance.objects.get_or_create(
+            group=group,
+            parent_concept=c1,
+            child_concept=ca.child)
+        self.add_item(group_instance)
+        self.reinterpret(before + [group_instance] + after)
 
     def trigram_verb_the_prop(self, trigram, before, after):
         verb, sw_the, _property = trigram

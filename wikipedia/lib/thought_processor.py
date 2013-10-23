@@ -79,6 +79,10 @@ class ThoughtProcessor():
                 self.process_unigram_assertion(item, before, after)
             if self.pr.recognize([item], "MONEY"):
                 self.process_unigram_money(item, before, after)
+            if self.pr.recognize([item], "ALIAS"):
+                self.process_unigram_alias(item, before, after)
+            if self.pr.recognize([item], "PUNC"):
+                self.process_unigram_punc(item, before, after)
 
     def process_bigrams(self, parsed_sentence):
         bigrams = [(x,y) for x,y in zip(parsed_sentence, parsed_sentence[1:])]
@@ -314,6 +318,8 @@ class ThoughtProcessor():
                 self.process_prep_lists(_6gram, before, after)
             if self.pr.recognize(_6gram, "CONCEPT SWS NUMBER CONCEPT SWS:from_the CONCEPT"):
                 self.process_from_the(_6gram, before, after)
+            if self.pr.recognize(_6gram, "CONCEPT PUNC:, SW:also ADJ:known SW:as CONCEPT"):
+                self._6gram_aka(_6gram, before, after)
             
 
     def process_c_is_a_c_on_the_c_of_c(self, parsed_sentence):
@@ -369,7 +375,7 @@ class ThoughtProcessor():
             #        )
 
     def process_group(self, parsed_sentence):
-        c1, sws, c2, sws, c3 = parsed_sentence
+        c1, sws, c2, sws, c3 = parsed_sentence[:5]
         categories = Category.objects.filter(
             child=c3).all()
         for category in categories:
@@ -434,6 +440,13 @@ class ThoughtProcessor():
             number=money.number.number,
             concept=dollar_concept)
         self.reinterpret(before + [amount] + after)
+
+    def process_unigram_alias(self, alias, before, after):
+        self.reinterpret(before + [alias.concept1] + after)
+        self.reinterpret(before + [alias.concept2] + after)
+
+    def process_unigram_punc(self, punc, before, after):
+        self.reinterpret(before + after)
 
     def process_bigram_names(self, bigram, before, after):
         n1, n2 = bigram
@@ -836,6 +849,14 @@ class ThoughtProcessor():
             child=c1)
         self.add_category(category)
 
+    def _6gram_aka(self, _6gram, before, after):
+        c1, punc, sw_also, adj, sw_as, c2 = _6gram
+        alias, created = Alias.objects.get_or_create(
+            concept1=c1,
+            concept2=c2)
+        self.add_item(alias)
+        self.reinterpret(before + [alias] + after)
+
     def process_from_the(self, _6gram, before, after):
         c1, sws1, number, c2, sws2, c3 = _6gram
         # No data structure supports this!!!
@@ -1107,12 +1128,22 @@ class ThoughtProcessor():
         self.add_group(group)
 
     def process_of_the(self, trigram, before, after):
-        concept1, sws, concept2 = trigram
-        group, created = Group.objects.get_or_create(
-            parent_concept=concept2,
-            child_concept=concept1)
-        self.add_group(group)
-        self.reinterpret(before + [group] + after)
+        c1, sws, c2 = trigram
+        c1_categories = Category.objects.filter(
+            child=c1).all() # Jesus is a type of Figure
+        if c1_categories:
+            for c1_ca in c1_categories:
+                groups = Group.objects.filter(
+                    parent_concept=c2,
+                    child_concept=c1_ca.parent).all() # Christian Relgion -> [Figure, Figure...]
+                if groups:
+                    for group in groups:
+                        group_instance, created = GroupInstance.objects.get_or_create(
+                            group=group,
+                            parent_concept=c2,
+                            child_concept=c1) # Christian Religon -> [Jesus]
+                        self.add_group(group_instance)
+                        self.reinterpret(before + [group_instance] + after)
 
     def process_trigram_number_cc(self, trigram, before, after):
         number, c1, c2 = trigram

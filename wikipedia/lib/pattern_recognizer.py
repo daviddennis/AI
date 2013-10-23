@@ -12,6 +12,7 @@ class PatternRecognizer():
             "ADJECTIVE": Adjective,
             "SW": Stopword,
             "PUNC": Punctuation,
+            "PUNCTUATION": Punctuation,
             "NUMBER": Number,
             "PREP": Preposition,
             "PREPOSITION": Preposition,
@@ -29,7 +30,8 @@ class PatternRecognizer():
             "CPREP": PrepConstruct,
             "MONEY": Money,
             "QUANTIFIER": Quantifier,
-            "Q": Quantifier
+            "Q": Quantifier,
+            "ALIAS": Alias
             }
 
     def recognize(self, item_list, pattern):
