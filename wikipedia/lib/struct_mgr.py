@@ -33,6 +33,6 @@ class StructureManager():
                 adj=adj)
         
         if not av.assertions.filter(pk=ass.id).count():
-            av.assertions.add(av)
+            av.assertions.add(ass)
 
         return ass

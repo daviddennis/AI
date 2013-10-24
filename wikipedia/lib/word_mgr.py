@@ -141,8 +141,12 @@ class WordManager():
                             return True
 
         return False
-                        
+
+    # TODO FIX!!!
     def _is(self, item1, item2):
+
+        return False
+
         c1 = item1
         c2 = None
         adj2 = None
@@ -156,8 +160,8 @@ class WordManager():
         if c2:
             assertions = Assertion.objects.filter(
                 concept1=c1,
-                relation=self.has_prop,
-                concept2=c2).all()
+                relation=self.has_prop).all()
+                #concept2=c2).all()
             if assertions:
                 return True
         if adj2:

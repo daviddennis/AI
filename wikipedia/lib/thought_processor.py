@@ -2,6 +2,7 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.word_mgr import WordManager
+from wikipedia.lib.utils import get_or_create_or_delete
 from wikipedia.models import *
 from django.db.models.loading import get_model
 import operator
@@ -493,10 +494,13 @@ class ThoughtProcessor():
         #         return
 
         relation = get_object_or_None(Relation, name="HasProperty")
-        assertion, created = Assertion.objects.get_or_create(
-            concept1=c1,
-            relation=relation)
+        #assertion, created = Assertion.objects.get_or_create(
+        #    concept1=c1,
+        #    relation=relation)
             #adj2=adj)
+        assertion, created = get_or_create_or_delete(Assertion,
+                                                     concept1=c1,
+                                                     relation=relation)
         self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_item(assertion)
         self.reinterpret(before + [assertion] + after)
