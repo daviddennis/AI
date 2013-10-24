@@ -337,17 +337,36 @@ class Property(models.Model):
 
     key_concept = models.ForeignKey(Concept, related_name="prop_key_set")
 
-    value_concept = models.ForeignKey(Concept, related_name="prop_value_set", null=True, blank=True)
-    value_amount = models.ForeignKey(Amount, related_name="prop_amount_set", null=True, blank=True)
+    sub_prop = models.ForeignKey('self', null=True, blank=True)
 
     def __unicode__(self):
-        if self.value_concept or self.value_amount:
-            return "%s-%s = %s" % (self.parent,
-                                   self.key_concept,
-                                   self.value_concept or self.value_amount)
+        output = ""
+        if self.sub_prop:
+            output = "%s-%s" % (self.parent, self.sub_prop)
         else:
-            return "%s-%s" % (self.parent,
-                              self.key_concept)
+            output = "%s-%s" % (self.parent, self.key_concept)
+        if self.pv_set:
+            values = [x.value for x in self.pv_set.all()]
+            if values:
+                output += " = " + str(values)
+        return output
+
+
+class PropertyValue(models.Model):
+
+    props = models.ManyToManyField(Property, related_name="pv_set")
+
+    concept = models.ForeignKey(Concept, related_name="prop_value_c_set", null=True, blank=True)
+    amount = models.ForeignKey(Amount, related_name="prop_amount_set", null=True, blank=True)
+
+    time = models.CharField(max_length=200, null=True, blank=True)
+
+    @property
+    def value(self):
+        return self.concept or self.amount
+
+    def __unicode__(self):
+        return str(self.prop) + " = " + str(self.value)
 
 class Entity(models.Model):
     first_name = models.CharField(max_length=100, null=True, blank=True)

@@ -217,26 +217,42 @@ class MediumThoughtProcessor():
 
     def trigram_property(self, trigram, before, after):
         prop, sw, c1 = trigram
-        prop.value_concept = c1
-        prop.save()
+        pv, created = PropertyValue.objects.get_or_create(
+            concept=c1)
+        if not pv.props.filter(pk=prop.id).count():
+            pv.props.add(prop)
+        #prop.value_concept = c1
+        #prop.save()
         self.add_item(prop)
 
     def trigram_property_amount(self, trigram, before, after):
         prop, sw, amount = trigram
-        prop.value_amount = amount
-        prop.save()
+        pv, created = PropertyValue.objects.get_or_create(
+            amount=amount)
+        if not pv.props.filter(pk=prop.id).count():
+            pv.props.add(prop)
+        #prop.value_amount = amount
+        #prop.save()
         self.add_item(prop)
 
     def trigram_c_is_property(self, trigram, before, after):
         c1, sw_is, prop = trigram
-        prop.value_concept = c1
-        prop.save()
+        pv, created = PropertyValue.objects.get_or_create(
+            concept=c1)
+        if not pv.props.filter(pk=prop.id).count():
+            pv.props.add(prop)
+        # prop.value_concept = c1
+        # prop.save()
         self.add_item(prop)
 
     def trigram_p_v_amount(self, trigram, before, after):
         p, verb_has, amount = trigram
-        p.value_amount = amount
-        p.save()
+        pv, created = PropertyValue.objects.get_or_create(
+            amount=amount)
+        if not pv.props.filter(pk=p.id).count():
+            pv.props.add(p)
+        # p.value_amount = amount
+        # p.save()
         self.add_item(p)
 
     def trigram_ppp(self, trigram, before, after):
@@ -339,8 +355,12 @@ class MediumThoughtProcessor():
     def _4gram_property(self, _4gram, before, after):
         prop, sw, verb, c1 = _4gram
         if not prop.value_concept:
-            prop.value_concept = c1
-            prop.save()
+            pv, created = PropertyValue.objects.get_or_create(
+                concept=c1)
+            if not pv.props.filter(pk=prop.id).count():
+                pv.props.add(prop)
+            # prop.value_concept = c1
+            # prop.save()
             self.add_item(prop)
 
     def _4gram_date(self, _4gram, before, after):
