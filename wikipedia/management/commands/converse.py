@@ -42,7 +42,9 @@ class Command(BaseCommand):
         nlp_generator.word_mgr = self.word_mgr
         interpreter.thought_processor = thought_processor
         interpreter.causation = causation
+        interpreter.struct_mgr = struct_mgr
         thought_processor.struct_mgr = struct_mgr
+        medium_thought_processor.struct_mgr = struct_mgr
         question_asker.nlp_generator = nlp_generator
         question_asker.word_mgr = self.word_mgr
         question_asker.query_mgr = query_mgr

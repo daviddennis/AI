@@ -7,7 +7,7 @@ class StructureManager():
 
     def add_pvalue(self, prop=None, pv=None, concept=None, amount=None):
         if not prop:
-            return
+            raise Exception('No property specified')
 
         if concept:
             pv, created = PropertyValue.objects.get_or_create(
@@ -20,3 +20,19 @@ class StructureManager():
             pv.props.add(prop)
         
         return prop
+
+    def add_av(self, ass=None, av=None, concept=None, adj=None):
+        if not ass:
+            raise Exception('No assertion specified')
+
+        if concept:
+            av, created = AssertionValue.objects.get_or_create(
+                concept=concept)
+        if adj:
+            av, created = AssertionValue.objects.get_or_create(
+                adj=adj)
+        
+        if not av.assertions.filter(pk=ass.id).count():
+            av.assertions.add(av)
+
+        return ass

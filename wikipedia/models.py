@@ -156,18 +156,33 @@ class Assertion(models.Model):
 
     relation = models.ForeignKey(Relation)
 
-    concept2 = models.ForeignKey(Concept, related_name="assertion_2_set", null=True, blank=True)
-    adj2 = models.ForeignKey(Adjective, related_name="adj_2_set", null=True, blank=True)
-
     score = models.IntegerField(null=True, blank=True)
     frequency = models.FloatField(null=True, blank=True)
     context = models.ForeignKey(Context, related_name="assertion_context_set", null=True, blank=True)
     
     def __unicode__(self):
-        orig = "%s %s %s" % (self.concept1, self.relation, (self.concept2 or self.adj2))
+        output = "%s %s " % (self.concept1 or self.property1, self.relation)
+        values = self.ass_value_set.all()
+        if values:
+            if len(values) == 1:
+                output += str(values[0])
+            else:
+                output += str(values)
         if self.context:
-            orig += " in the context of %s" % self.context.concept.name
-        return orig
+            output += " in the context of %s" % self.context.concept.name
+        return output
+
+
+class AssertionValue(models.Model):
+    assertions = models.ManyToManyField(Assertion, related_name="ass_value_set")
+    
+    concept = models.ForeignKey(Concept, related_name="ass_c_value_set", null=True, blank=True)
+    adj = models.ForeignKey(Adjective, related_name="ass_adj_value_set", null=True, blank=True)
+
+    def __unicode__(self):
+        value = self.concept or self.adj
+        return str(value)
+
 
 # NL Structure
 class Amount(models.Model):

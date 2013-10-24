@@ -484,17 +484,20 @@ class ThoughtProcessor():
 
     def process_bigram_adj_c(self, bigram, before, after):
         adj, c1 = bigram
-        if Concept.objects.filter(name__like=adj.name+" "+c1.name+"%").all():
-            adj_to_c = get_object_or_None(Concept, name=adj.name)
-            if adj_to_c:
-                self.reinterpret(before + [adj_to_c, c1] + after)
-                return
+
+        ## white red car
+        # if Concept.objects.filter(name__like=adj.name+" "+c1.name+"%").all():
+        #     adj_to_c = get_object_or_None(Concept, name=adj.name)
+        #     if adj_to_c:
+        #         self.reinterpret(before + [adj_to_c, c1] + after)
+        #         return
 
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            adj2=adj)
+            relation=relation)
+            #adj2=adj)
+        self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_item(assertion)
         self.reinterpret(before + [assertion] + after)
 
@@ -620,8 +623,9 @@ class ThoughtProcessor():
             relation = get_object_or_None(Relation, name="UsedFor")
             assertion, created = Assertion.objects.get_or_create(
                 concept1=concept1,
-                relation=relation,
-                concept2=concept2)
+                relation=relation)
+                #concept2=concept2)
+            self.struct_mgr.add_av(ass=assertion, concept=concept2)
             self.add_assertion(assertion)
 
     def process_file(self, parsed_sentence):
@@ -702,8 +706,9 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=concept1,
-            relation=relation,
-            concept2=concept2)
+            relation=relation)
+            #concept2=concept2)
+        self.struct_mgr.add_av(ass=assertion, concept=concept2)
         self.add_assertion(assertion)
 
     def process_add_quoted_concept(self, parsed_sentence):
@@ -761,8 +766,9 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name='HasProperty')
         assertion, created = Assertion.objects.get_or_create(
            concept1=c2,
-           relation=relation,
-           adj2=adj)
+           relation=relation)
+           #adj2=adj)
+        self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_assertion(assertion)
         verb_construct, created = VerbConstruct.objects.get_or_create(
             concept1=c1,
@@ -1069,8 +1075,9 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=concept1,
-            relation=relation,
-            concept2=concept2)
+            relation=relation)
+            #concept2=concept2)
+        self.struct_mgr.add_av(ass=assertion, concept=concept2)
         self.add_assertion(assertion)        
 
     def process_is(self, triple, before, after):
@@ -1079,8 +1086,9 @@ class ThoughtProcessor():
         assertion, created = Assertion.objects.get_or_create(
            concept1=concept1,
            relation=relation,
-           concept2=concept2,
+           #concept2=concept2,
            context=self.get_context())
+        self.struct_mgr.add_av(ass=assertion, concept=concept2)
         self.add_assertion(assertion)
         self.reinterpret(before + [assertion] + after)
         return assertion
@@ -1092,9 +1100,10 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            concept2=None,
-            adj2=adj)
+            relation=relation)
+            #concept2=None,
+            #adj2=adj)
+        self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.reinterpret(before + [assertion] + after)
 
     def trigram_c_isa_adj(self, trigram, before, after):
@@ -1102,9 +1111,10 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            concept2=None,
-            adj2=adj)
+            relation=relation)
+            #concept2=None,
+            #adj2=adj)
+        self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_item(assertion)
         self.reinterpret(before + [assertion] + after)
 
@@ -1179,13 +1189,15 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            concept2=None,
-            adj2=None)
+            relation=relation)
+            #concept2=None,
+            #adj2=None)
         if ass1.concept2:
-            assertion.concept2 = ass1.concept2
+            self.struct_mgr.add_av(ass=assertion, concept=concept2)
+        #    assertion.concept2 = ass1.concept2
         elif ass1.adj2:
-            assertion.adj2 = ass1.adj2
+            self.struct_mgr.add_av(ass=assertion, adj=adj2)
+        #    assertion.adj2 = ass1.adj2
         self.add_item(assertion)
         self.reinterpret(before + [c1, sws_isa, ass1.concept1] + after)
 
@@ -1194,8 +1206,9 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="IsNotA")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            concept2=c2)
+            relation=relation)
+            #concept2=c2)
+        self.struct_mgr.add_av(ass=assertion, concept=c2)
         self.add_assertion(assertion)
 
     def trigram_c_and_c(self, trigram, before, after):
@@ -1243,8 +1256,9 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="IsNot")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            adj2=adj)
+            relation=relation)
+            #adj2=adj)
+        self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_assertion(assertion)
 
     def process_trigram_property_of(self, item_group, before, after):
@@ -1310,16 +1324,19 @@ class ThoughtProcessor():
         #        assertion.delete()
         #    print 'Removed %s' % assertions[0]
 
+    # TODO: FIX!!!
     def process_is_not(self, triple, before, after):
         concept1, sws, concept2 = triple
         assertions = Assertion.objects.filter(
             concept1=concept1,
-            relation__name="HasProperty",
-            concept2=concept2)
-        if assertions:
-            for assertion in assertions:
-                assertion.delete()
-            print 'Removed %s' % assertions[0]
+            relation__name="HasProperty").all()
+        return
+            #concept2=concept2)
+        #if assertions:
+        #    for assertion in assertions:
+        #        if assertion.
+        #        assertion.delete()
+        #    print 'Removed %s' % assertions[0]
 
     def process_add_concept(self, triple, before, after):
         concept_name = triple[2]
@@ -1329,7 +1346,9 @@ class ThoughtProcessor():
             print 'Created %s' % concept
         return concept
 
+    # TODO: FIX!!!
     def process_list_concepts(self, triple, before, after):
+        return
         concept = triple[2]
         assertions = Assertion.objects.filter(
             relation__name="IsA",
@@ -1345,8 +1364,9 @@ class ThoughtProcessor():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=c1,
-            relation=relation,
-            concept2=c2)
+            relation=relation)
+            #concept2=c2)
+        self.struct_mgr.add_av(ass=assertion, concept=c2)
         self.add_assertion(assertion)
         self.reinterpret(before + [assertion] + after)
 

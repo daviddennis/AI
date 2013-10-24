@@ -13,6 +13,7 @@ class MediumThoughtProcessor():
         self.pr = PatternRecognizer()
         self.interpretations = []
         self.learned = {}
+        self.struct_mgr = None
         
     def process_thought(self, parsed_sentence, thinker=None):
         if thinker:
@@ -266,21 +267,23 @@ class MediumThoughtProcessor():
         self.add_item(pc)
         self.reinterpret(before + [pc] + after)
 
+    # TODO: FIX!!!
     def trigram_cprep_isa_ass(self, trigram, before, after):
         cprep, sws_isa, assertion = trigram
         relation = get_object_or_None(Relation, name="HasProperty")
-        if assertion.adj2:
-            new_assertion, created = Assertion.objects.get_or_create(
-                concept1=cprep.concept1,
-                relation=relation,
-                adj2=assertion.adj2)
-            self.add_item(new_assertion)
-        if assertion.concept2:
-            new_assertion, created = Assertion.objects.get_or_create(
-                concept1=cprep.concept1,
-                relation=relation,
-                concept2=assertion.concept2)
-            self.add_item(new_assertion)
+        raise Exception('FIX!!!')
+        # if assertion.adj2:
+        #     new_assertion, created = Assertion.objects.get_or_create(
+        #         concept1=cprep.concept1,
+        #         relation=relation,
+        #         adj2=assertion.adj2)
+        #     self.add_item(new_assertion)
+        # if assertion.concept2:
+        #     new_assertion, created = Assertion.objects.get_or_create(
+        #         concept1=cprep.concept1,
+        #         relation=relation,
+        #         concept2=assertion.concept2)
+        #     self.add_item(new_assertion)
 
     def trigram_vc_prep_c(self, trigram, before, after):
         vc, prep, concept = trigram

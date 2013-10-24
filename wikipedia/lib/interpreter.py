@@ -24,6 +24,7 @@ class Interpreter():
         self.thought_processor = None
         self.time_mgr = TimeManager()
         self.learned = {}
+        self.struct_mgr = None
 
         self.user = get_object_or_None(Concept, name="DAVID DENNIS")
         self.ai = get_object_or_None(Concept, name="AI")
@@ -668,8 +669,9 @@ class Interpreter():
         relation = get_object_or_None(Relation, name="HasProperty")
         assertion, created = Assertion.objects.get_or_create(
             concept1=concept1,
-            relation=relation,
-            concept2=concept2)
+            relation=relation)
+            #concept2=concept2)
+        self.struct_mgr.add_av(ass=assertion, concept=concept2)
         self.add_interpretation(before + [assertion] + after)
 
     def trigram_time(self, trigram, before, after):
@@ -895,8 +897,10 @@ class Interpreter():
 
         assertion, created = Assertion.objects.get_or_create(
             concept1=concept,
-            relation=Relation.objects.get(name="IsA"),
-            concept2=concept_category)
+            relation=Relation.objects.get(name="IsA"))
+            #concept2=concept_category)
+
+        self.struct_mgr.add_av(ass=assertion, concept=concept_category)
 
         self.interpret(before + [concept] + after, last_transform="is_a")
         print '%s is a %s' % (concept, concept_category)
