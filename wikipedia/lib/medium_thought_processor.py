@@ -112,6 +112,8 @@ class MediumThoughtProcessor():
                self._4gram_can(_4gram, before, after)
             if self.pr.recognize(_4gram, "AMOUNT SW:in SW CONCEPT"):
                 self._4gram_amount_group(_4gram, before, after)
+            if self.pr.recognize(_4gram, "PROPERTY PUNC:' SW:s CONCEPT"):
+                self._4gram_sub_prop(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CATEGORY SW:because ASSERTION"):
             #    print _4gram,'!!!!\n\n\n'
 
@@ -405,6 +407,12 @@ class MediumThoughtProcessor():
             size=amount.number)
         self.add_item(group)
         self.reinterpret(before + [group] + after)
+
+    def _4gram_sub_prop(self, _4gram, before, after):
+        prop, punc, sw_s, c = _4gram
+        prop = prop.add_subprop(concept=c)
+        self.add_item(prop)
+        self.reinterpret(before + [prop] + after)
 
     def _5gram_group(self, _5gram, before, after):
         concept, sw, number, sws, group = _5gram

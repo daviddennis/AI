@@ -14,6 +14,7 @@ class ThoughtProcessor():
     def __init__(self):
         self.pr = PatternRecognizer()
         self.word_mgr = WordManager()
+        self.struct_mgr = None
         self.learned = {}
         self.interpretations = []
 
@@ -1109,8 +1110,9 @@ class ThoughtProcessor():
 
     def trigram_prop_value(self, trigram, before, after):
         prop, sw, c = trigram
-        prop.value_concept = c
-        prop.save()
+        self.struct_mgr.add_pvalue(
+            prop=prop,
+            concept=c)
         self.add_item(prop)
         self.reinterpret(before + [prop] + after)
 

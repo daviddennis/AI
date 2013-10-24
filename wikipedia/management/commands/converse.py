@@ -10,6 +10,7 @@ from wikipedia.lib.medium_thought_processor import MediumThoughtProcessor
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.lib.query_processor import QueryProcessor
 from wikipedia.lib.question_asker import QuestionAsker
+from wikipedia.lib.struct_mgr import StructureManager
 from wikipedia.lib.auto_translate import translations
 from sys import stdout
 from time import sleep
@@ -35,11 +36,13 @@ class Command(BaseCommand):
         thought_processor = ThoughtProcessor()
         medium_thought_processor = MediumThoughtProcessor()
         question_asker = QuestionAsker()
+        struct_mgr = StructureManager()
 
         nlp_generator.parser = interpreter.parser
         nlp_generator.word_mgr = self.word_mgr
         interpreter.thought_processor = thought_processor
         interpreter.causation = causation
+        thought_processor.struct_mgr = struct_mgr
         question_asker.nlp_generator = nlp_generator
         question_asker.word_mgr = self.word_mgr
         question_asker.query_mgr = query_mgr

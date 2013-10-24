@@ -339,6 +339,21 @@ class Property(models.Model):
 
     sub_prop = models.ForeignKey('self', null=True, blank=True)
 
+    def add_subprop(self, prop=None, concept=None):
+
+        if prop:
+            raise Exception('No add subprop prop handling')
+
+        if concept:
+            new_sp, created = Property.objects.get_or_create(
+                parent=self.key_concept,
+                key_concept=concept)
+            prop, created = Property.objects.get_or_create(
+                parent=self.parent,
+                key_concept=self.key_concept,
+                sub_prop=new_sp)
+            return prop
+
     def __unicode__(self):
         output = ""
         if self.sub_prop:
@@ -347,8 +362,10 @@ class Property(models.Model):
             output = "%s-%s" % (self.parent, self.key_concept)
         if self.pv_set:
             values = [x.value for x in self.pv_set.all()]
-            if values:
+            if len(values) > 1:
                 output += " = " + str(values)
+            elif values:
+                output += " = " + str(values[0])
         return output
 
 
