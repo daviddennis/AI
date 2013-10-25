@@ -69,6 +69,8 @@ class MediumThoughtProcessor():
                 self.trigram_property(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY SW:is AMOUNT"):
                 self.trigram_property_amount(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY SW:is ADJ"):
+                self.trigram_property_is_adj(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY SW:of AMOUNT"):
                 self.trigram_property_amount(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:is PROPERTY"):
@@ -237,6 +239,16 @@ class MediumThoughtProcessor():
         #prop.value_amount = amount
         #prop.save()
         self.add_item(prop)
+
+    def trigram_property_is_adj(self, trigram, before, after):
+        prop, sw_is, adj = trigram
+        relation = get_object_or_None(Relation, name="HasProperty")
+        ass, created = Assertion.objects.get_or_create(
+            property1=prop,
+            relation=relation)
+        self.struct_mgr.add_av(ass=ass, adj=adj)
+        self.add_item(ass)
+        self.reinterpret(before + [ass] + after)
 
     def trigram_c_is_property(self, trigram, before, after):
         c1, sw_is, prop = trigram

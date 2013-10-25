@@ -151,7 +151,7 @@ class Adjective(models.Model):
 
 
 class Assertion(models.Model):
-    concept1 = models.ForeignKey(Concept, related_name="assertion_1_set")
+    concept1 = models.ForeignKey(Concept, related_name="assertion_1_set", null=True, blank=True)
     property1 = models.ForeignKey('Property', related_name="ass_prop_1_set", null=True, blank=True)
 
     relation = models.ForeignKey(Relation)

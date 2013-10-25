@@ -281,8 +281,8 @@ class ThoughtProcessor():
             self.process_if(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "SW:if VERBCONSTRUCT SW:then VERBCONSTRUCT"):
             self.process_if(parsed_sentence)
-        if self.pr.recognize(parsed_sentence, "CONCEPT PUNC:' SW:s CONCEPT"):
-            self.process_apostrophe(parsed_sentence)
+        #if self.pr.recognize(parsed_sentence, "CONCEPT PUNC:' SW:s CONCEPT"):
+        #    self.process_apostrophe(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "VERB CONCEPT SW:into CONCEPT"):
             self.process_into(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "CONCEPT VERB:have NUMBER CONCEPT"):
@@ -597,11 +597,21 @@ class ThoughtProcessor():
             complex_verb, created = ComplexVerb.objects.get_or_create(
                 verb=vc.verb,
                 preposition=prep)
-            vc.verb = None
-            vc.complex_verb = complex_verb
-            vc.save()
-            self.add_item(vc)
-            self.reinterpret(before + [vc] + after)
+            new_vc, created = get_or_create_or_delete(VerbConstruct,
+                concept1=vc.concept1,
+                amount1=vc.amount1,
+                complex_verb=complex_verb,
+                concept2=vc.concept2,
+                amount2=vc.amount2,
+                assertion2=vc.assertion2,
+                question_fragment2=vc.question_fragment2,
+                verb_construct2=vc.verb_construct2,
+                property2=vc.property2)
+            #vc.verb = None
+            #vc.complex_verb = complex_verb
+            #vc.save()
+            self.add_item(new_vc)
+            self.reinterpret(before + [new_vc] + after)
 
     def process_if(self, parsed_sentence):
         _if, item1, then, item2 = tuple(parsed_sentence)
@@ -839,7 +849,8 @@ class ThoughtProcessor():
         else:
             _property, created = Property.objects.get_or_create(
                 parent=c1,
-                key_concept=c2)
+                key_concept=c2,
+                sub_prop=None)
             self.add_item(_property)
             self.remember(_property)
             self.reinterpret(before + [_property] + after)
@@ -1102,11 +1113,14 @@ class ThoughtProcessor():
     def process_are_adj(self, item_group, before, after):
         c1, sw_are, adj = item_group
         relation = get_object_or_None(Relation, name="HasProperty")
-        assertion, created = Assertion.objects.get_or_create(
-            concept1=c1,
-            relation=relation)
+        #assertion, created = Assertion.objects.get_or_create(
+        #    concept1=c1,
+        #    relation=relation)
             #concept2=None,
             #adj2=adj)
+        assertion, created = get_or_create_or_delete(Assertion,
+                                                     concept1=c1,
+                                                     relation=relation)
         self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.reinterpret(before + [assertion] + after)
 
