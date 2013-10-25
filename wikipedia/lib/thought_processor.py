@@ -172,6 +172,8 @@ class ThoughtProcessor():
                 self.process_prepconstruct(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_not ADJECTIVE"):
                 self.process_isnot(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:is VERB"):
+                self.trigram_c_is_v(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:is_not_a CONCEPT"):
                 self.process_trigram_c_isnota_c(item_group, before, after)
             if self.pr.recognize(item_group, "CONCEPT SWS:is_a ASSERTION"):
@@ -269,6 +271,8 @@ class ThoughtProcessor():
                 self.process_4gram_property_had(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT SW:or CONCEPT SWS:is_a"):
                 self.process_4gram_alias(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CATEGORY SW:that CONCEPT VERB"):
+                self.process_4gram_that(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CONCEPT VERB SW:the LIST"):
             #    self._4gram_vc_list(_4gram, before, after)
 
@@ -577,10 +581,11 @@ class ThoughtProcessor():
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
         if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
-            question_fragment, created = QuestionFragment.objects.get_or_create(
+            q_frag, created = QuestionFragment.objects.get_or_create(
                 q_word=sw.name,
                 verb_construct=verb_construct)
-            self.add_item(question_fragment)
+            self.add_item(q_frag)
+            self.reinterpret(before + [q_frag] + after)
 
     def process_bigram_complex_verb(self, bigram, before, after):
         verb, prep = bigram
@@ -708,6 +713,15 @@ class ThoughtProcessor():
         self.add_item(alias)
         self.reinterpret(before + [c1, sws_isa] + after)
         self.reinterpret(before + [c2, sws_isa] + after)
+
+    def process_4gram_that(self, _4gram, before, after):
+        ca, sw_that, c1, verb = _4gram
+        vc, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            verb=verb,
+            concept2=ca.child)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
 
     def _4gram_vc_list(self, _4gram, before, after):
         c1, v, sw_the, _list = _4gram
@@ -1096,17 +1110,22 @@ class ThoughtProcessor():
         self.add_assertion(assertion)        
 
     def process_is(self, triple, before, after):
-        concept1, stopword, concept2 = triple
-        relation = get_object_or_None(Relation, name="HasProperty")
-        assertion, created = Assertion.objects.get_or_create(
-           concept1=concept1,
-           relation=relation,
+        c1, stopword, c2 = triple
+        ca, created = Category.objects.get_or_create(
+            parent=c2,
+            child=c1)
+        self.add_item(ca)
+        self.reinterpret(before + [ca] + after)
+        #relation = get_object_or_None(Relation, name="HasProperty")
+        #assertion, created = Assertion.objects.get_or_create(
+        #   concept1=concept1,
+        #   relation=relation,
            #concept2=concept2,
-           context=self.get_context())
-        self.struct_mgr.add_av(ass=assertion, concept=concept2)
-        self.add_assertion(assertion)
-        self.reinterpret(before + [assertion] + after)
-        return assertion
+        #   context=self.get_context())
+        #self.struct_mgr.add_av(ass=assertion, concept=concept2)
+        #self.add_assertion(assertion)
+        #self.reinterpret(before + [assertion] + after)
+        #return assertion
         #self.causation.consider_implications(assertion)
         #return assertion
 
@@ -1278,6 +1297,15 @@ class ThoughtProcessor():
             #adj2=adj)
         self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_assertion(assertion)
+
+    def trigram_c_is_v(self, trigram, before, after):
+        c1, sw_is, verb = trigram
+        vc, created = VerbConstruct.objects.get_or_create(
+            concept1=None,
+            verb=verb,
+            concept2=c1)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
 
     def process_trigram_property_of(self, item_group, before, after):
         c1, sw_of, c2 = item_group

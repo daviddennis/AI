@@ -176,9 +176,10 @@ class Parser():
 
         if tags:
             for word, pos_tag in tags:
-                if 'NN' in pos_tag:
-                    if word == tokens[0]:
-                        return ([item], False)
+                if 'NN' in pos_tag and word == tokens[0]:
+                    return ([item], False)
+                if 'V' in pos_tag and word == tokens[0]:
+                    return ([item], False)                
 
         adjective = get_object_or_None(Adjective, superlative=tokens[0])
         if adjective:

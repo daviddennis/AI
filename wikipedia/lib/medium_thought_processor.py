@@ -42,6 +42,8 @@ class MediumThoughtProcessor():
             after = parsed_sentence[i+2:]
             if self.pr.recognize(bigram, "PROPERTY AMOUNT"):
                 self.bigram_prop_amt(bigram, before, after)
+            if self.pr.recognize(bigram, "PROPERTY CONCEPT"):
+                self.bigram_prop_c(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT VERBCONSTRUCT"):
                 self.bigram_c_vc(bigram, before, after)
 
@@ -147,6 +149,22 @@ class MediumThoughtProcessor():
         prop.value_amount = amount
         prop.save()
         self.add_item(prop)
+
+    def bigram_prop_c(self, bigram, before, after):
+        prop, c = bigram
+        #new_prop = self.struct_mgr.add_pvalue(prop=prop, concept=c)
+
+        sub_prop, created = Property.objects.get_or_create(
+            parent=prop.key_concept,
+            key_concept=c)
+
+        new_prop, created = Property.objects.get_or_create(
+            parent=prop.parent,
+            key_concept=prop.key_concept,
+            sub_prop=sub_prop)
+
+        self.add_item(new_prop)
+        self.reinterpret(before + [new_prop] + after)
 
     def bigram_c_vc(self, bigram, before, after):
         c1, vc = bigram
@@ -425,9 +443,16 @@ class MediumThoughtProcessor():
 
     def _4gram_sub_prop(self, _4gram, before, after):
         prop, punc, sw_s, c = _4gram
-        prop = prop.add_subprop(concept=c)
-        self.add_item(prop)
-        self.reinterpret(before + [prop] + after)
+        new_prop = prop.add_subprop(concept=c)
+        self.add_item(new_prop)
+        self.reinterpret(before + [new_prop] + after)
+
+        if self.word_mgr.is_plural(c):
+            group, created = Group.objects.get_or_create(
+                parent_property=prop,
+                child_concept=self.word_mgr.get_singular_concept(c))
+            self.add_item(group)
+            self.reinterpret(before + [group] + after)
 
     def _5gram_group(self, _5gram, before, after):
         concept, sw, number, sws, group = _5gram

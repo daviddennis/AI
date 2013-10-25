@@ -73,28 +73,30 @@ class StopwordSequence(models.Model):
 
 
 class Group(models.Model):
-    parent_concept = models.ForeignKey(Concept, related_name="abstract_parent_set")
+    parent_property = models.ForeignKey('Property', null=True, blank=True)
+    parent_concept = models.ForeignKey(Concept, related_name="abstract_parent_set", null=True, blank=True)
     child_concept = models.ForeignKey(Concept, related_name="abstract_child_set")
     size = models.IntegerField(null=True, blank=True)
 
     def __unicode__(self):
+        parent = self.parent_concept or self.parent_property
         if self.size:
             if self.size == 3:
-                val = "%s -> [%s, %s, %s]" % (self.parent_concept, 
+                val = "%s -> [%s, %s, %s]" % (parent, 
                                               self.child_concept, 
                                               self.child_concept,
                                               self.child_concept)
             elif self.size == 2:
-                val = "%s -> [%s, %s]" % (self.parent_concept, 
+                val = "%s -> [%s, %s]" % (parent, 
                                           self.child_concept, 
                                           self.child_concept)
             else:
-                val = "%s -> [%s, %s, %s, ...]" % (self.parent_concept, 
+                val = "%s -> [%s, %s, %s, ...]" % (parent, 
                                                    self.child_concept, 
                                                    self.child_concept,
                                                    self.child_concept)
         else:   
-            val = "%s -> [%s, %s, %s, ...]" % (self.parent_concept, 
+            val = "%s -> [%s, %s, %s, ...]" % (parent, 
                                                self.child_concept, 
                                                self.child_concept,
                                                self.child_concept)
@@ -419,6 +421,7 @@ class Quantifier(models.Model):
     def __unicode__(self):
         return self.name
 
+
 class Name(models.Model):
     concept = models.ForeignKey(Concept, related_name="name_c_set", null=True, blank=True)
 
@@ -433,6 +436,20 @@ class Name(models.Model):
     
     def __unicode__(self):
         return "(%s) name for (%s)" % (self.concept, self.arg2)
+
+
+class Negation(models.Model):
+
+    verb_construct = models.ForeignKey(VerbConstruct, null=True, blank=True)
+    prep_construct = models.ForeignKey(PrepConstruct, null=True, blank=True)
+    assertion = models.ForeignKey(Assertion, null=True, blank=True)
+
+    @property
+    def item(self):
+        return self.verb_construct or self.prep_construct or self.assertion
+
+    def __unicode__(self):
+        return self.item
 
 # Class SentenceRecord
 
