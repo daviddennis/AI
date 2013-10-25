@@ -198,6 +198,8 @@ class ThoughtProcessor():
                 self.process_trigram_large_number(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SWS:is_a ADJECTIVE"):
                 self.trigram_c_isa_adj(trigram, before, after)
+            if self.pr.recognize(trigram, "ADJECTIVE CONCEPT CONCEPT"):
+                self.trigram_adj_cc(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY SW:is CONCEPT"):
                 self.trigram_prop_value(trigram, before, after)
             if self.pr.recognize(trigram, "ADJ SWS:is_a CONCEPT"):
@@ -1154,6 +1156,12 @@ class ThoughtProcessor():
         self.struct_mgr.add_av(ass=assertion, adj=adj)
         self.add_item(assertion)
         self.reinterpret(before + [assertion] + after)
+
+    def trigram_adj_cc(self, trigram, before, after):
+        adj, c1, c2 = trigram
+        new_c = get_object_or_None(Concept, name="%s %s %s" % (adj.name, c1.name, c2.name))
+        if new_c:
+            self.reinterpret(before + [new_c] + after)
 
     def trigram_prop_value(self, trigram, before, after):
         prop, sw, c = trigram

@@ -4,7 +4,8 @@ from django.dispatch import receiver
 from wikipedia.lib.utils import autoconnect_to_signals
 
 class Concept(models.Model):
-    name = models.CharField(max_length=1000)
+    name = models.CharField(db_index=True, max_length=1000)
+
     plural_name = models.CharField(max_length=500, null=True, blank=True)
     frequency = models.IntegerField(null=True)
     stats_status = models.CharField(max_length=200, default="needs update", null=False)
@@ -450,6 +451,7 @@ class Negation(models.Model):
 
     def __unicode__(self):
         return self.item
+
 
 # Class SentenceRecord
 
