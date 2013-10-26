@@ -36,3 +36,28 @@ class StructureManager():
             av.assertions.add(ass)
 
         return ass
+
+
+    def cc_group_instance(self, child=None, head=None):
+
+        if not isinstance(child, Concept) or not isinstance(head, Concept):
+            return None
+        
+        # ca(child -> c1) : (head -> [c1])
+
+        child_category_concepts = [ca.parent for ca in child.category_set.all()]
+        if child_category_concepts:
+            groups = Group.objects.filter(
+                parent_concept=head,
+                child_concept__in=child_category_concepts).all()
+            if groups:
+                group = groups[0]
+                group_instance, created = GroupInstance.objects.get_or_create(
+                    group=group,
+                    parent_concept=head,
+                    child_concept=child)
+                return group_instance
+
+        return None
+        
+        

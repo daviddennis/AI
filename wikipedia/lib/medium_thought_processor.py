@@ -31,6 +31,8 @@ class MediumThoughtProcessor():
             after = parsed_sentence[i+1:]
             if self.pr.recognize([unigram], "PROPERTY"):
                 self.unigram_property(unigram, before, after)
+            if self.pr.recognize([unigram], "GI"):
+                self.unigram_gi(unigram, before, after)
             
 
     def process_bigrams(self, parsed_sentence):
@@ -119,6 +121,8 @@ class MediumThoughtProcessor():
                 self._4gram_amount_group(_4gram, before, after)
             if self.pr.recognize(_4gram, "PROPERTY PUNC:' SW:s CONCEPT"):
                 self._4gram_sub_prop(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SWS:that_was CVERB TIME"):
+                self._4gram_thatwas_cv_time(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CATEGORY SW:because ASSERTION"):
             #    print _4gram,'!!!!\n\n\n'
 
@@ -143,6 +147,9 @@ class MediumThoughtProcessor():
                 child_concept=self.word_mgr.get_singular_concept(_property.key_concept))
             self.add_item(group)
             self.reinterpret(before + [group] + after)
+
+    def unigram_gi(self, group_instance, before, after):
+        self.reinterpret(before + [group_instance.parent_concept] + after)
 
     def bigram_prop_amt(self, bigram, before, after):
         prop, amount = bigram
@@ -453,6 +460,15 @@ class MediumThoughtProcessor():
                 child_concept=self.word_mgr.get_singular_concept(c))
             self.add_item(group)
             self.reinterpret(before + [group] + after)
+
+    def _4gram_thatwas_cv_time(self, _4gram, before, after):
+        c1, sws_thatwas, cverb, time = _4gram
+        vc, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            complex_verb=cverb,
+            time=time.name)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
 
     def _5gram_group(self, _5gram, before, after):
         concept, sw, number, sws, group = _5gram

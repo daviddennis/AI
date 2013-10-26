@@ -31,7 +31,8 @@ class PatternRecognizer():
             "MONEY": Money,
             "QUANTIFIER": Quantifier,
             "Q": Quantifier,
-            "ALIAS": Alias
+            "ALIAS": Alias,
+            "GI": GroupInstance
             }
 
     def recognize(self, item_list, pattern):

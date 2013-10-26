@@ -11,13 +11,13 @@ class Concept(models.Model):
     stats_status = models.CharField(max_length=200, default="needs update", null=False)
     url = models.CharField(max_length=2000, null=True)
 
-    time_keyword = None
+    time = None
 
     hit = 0
 
     def __unicode__(self):
-        if self.time_keyword:
-            return self.name + ' at ' + self.time_keyword
+        if self.time:
+            return '%s at %s' % (self.name, self.time)
         else:
             return self.name
 
@@ -54,6 +54,13 @@ class Category(models.Model):
     def __unicode__(self):
         return "%s is a type of %s" % (self.child, self.parent)
 
+# class ConceptType(models.Model):
+#     concept = models.ForeignKey(Concept, related_name="ctype_c_set")
+#     _type = models.ForeignKey(Concept, related_name="ctype_type_set")
+
+#     def __unicode__(self):
+#         return "%s TYPE %s" % (self.concept, self._type)
+
 class PersonName(models.Model):
     name = models.CharField(max_length=500)
     frequency = models.FloatField(null=True, blank=True)
@@ -74,9 +81,12 @@ class StopwordSequence(models.Model):
 
 
 class Group(models.Model):
+
     parent_property = models.ForeignKey('Property', null=True, blank=True)
     parent_concept = models.ForeignKey(Concept, related_name="abstract_parent_set", null=True, blank=True)
+
     child_concept = models.ForeignKey(Concept, related_name="abstract_child_set")
+
     size = models.IntegerField(null=True, blank=True)
 
     def __unicode__(self):
@@ -107,8 +117,11 @@ class Group(models.Model):
 
 
 class GroupInstance(models.Model):
+
     group = models.ForeignKey(Group, related_name="instance_set")
+
     parent_concept = models.ForeignKey(Concept, related_name="parent_set")
+
     child_concept = models.ForeignKey(Concept, related_name="child_set")
 
     def __unicode__(self):
@@ -482,10 +495,18 @@ class Number():
 
     @property
     def number(self):
-        return float(self.name)
+        num = float(self.name)
+        if num.is_integer():
+            return int(num)
+        else:
+            return num
 
     def __repr__(self):
-        return "Number: %s" % ("{:,.2f}".format(float(self.name)))
+        num = float(self.name)
+        if num.is_integer():
+            return "Number: %s" % (int(num))
+        else:
+            return "Number: %s" % ("{:,.2f}".format(float(self.name)))
 
 
 class Time():

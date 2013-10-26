@@ -1,4 +1,5 @@
 from nltk.stem.wordnet import WordNetLemmatizer
+from django.db.models import Q
 from wikipedia.lib.parser import Parser
 from annoying.functions import get_object_or_None
 from wikipedia.models import *
@@ -236,3 +237,16 @@ class WordManager():
             except:
                 pass
         return False
+
+    def get_aliases(self, c1):
+
+        alias_concept_set = set()
+
+        aliases = Alias.objects.filter( Q(concept1=c1) | Q(concept2=c1) ).all()
+        for a in aliases:
+            if a.concept1 != c1:
+                alias_concept_set.add(a.concept1)
+            if a.concept2 != c1:
+                alias_concept_set.add(a.concept2)
+
+        return list(alias_concept_set)

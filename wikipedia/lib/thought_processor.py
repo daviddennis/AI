@@ -275,10 +275,13 @@ class ThoughtProcessor():
                 self.process_4gram_alias(_4gram, before, after)
             if self.pr.recognize(_4gram, "CATEGORY SW:that CONCEPT VERB"):
                 self.process_4gram_that(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT SW:was CVERB CONCEPT"):
+                self._4gram_was_cverb_c(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CONCEPT VERB SW:the LIST"):
             #    self._4gram_vc_list(_4gram, before, after)
 
 
+        #TODO: Change to ORs
         if self.pr.recognize(parsed_sentence, "SW:if ASSERTION SW:then VERBCONSTRUCT"):
             self.process_if(parsed_sentence)
         if self.pr.recognize(parsed_sentence, "SW:if VERBCONSTRUCT SW:then ASSERTION"):
@@ -310,6 +313,8 @@ class ThoughtProcessor():
                 self.process_is_verb_as(_5gram, before, after)
             if self.pr.recognize(_5gram, "VERB:remove CONCEPT:concept PUNC:' CONCEPT PUNC:'"):
                 self.process_remove_quote(_5gram, before, after)
+            if self.pr.recognize(_5gram, "CONCEPT SW:was CVERB SW:the CONCEPT"):
+                self._5gram_was_cverb_c(_5gram, before, after)
 
 
     def process_6grams(self, parsed_sentence):
@@ -521,6 +526,8 @@ class ThoughtProcessor():
     def bigram_cc(self, bigram, before, after):
         c1, c2 = bigram
         new_c = get_object_or_None(Concept, name=c1.name + " " + c2.name)
+
+        # Larger Concepts
         if new_c:
             self.reinterpret(before + [new_c] + after)
         else:
@@ -533,6 +540,13 @@ class ThoughtProcessor():
                 new_c = get_object_or_None(Concept, name=c1.name + " " + c2.name)
                 if new_c:
                     self.reinterpret(before + [new_c] + after)
+
+        # Group Instance
+        gi = self.struct_mgr.cc_group_instance(child=c1, head=c2)
+        if gi:
+            self.add_item(gi)
+            self.reinterpret(before + [gi] + after)
+            self.reinterpret(before + [gi.parent_concept] + after)
 
     def bigram_c_vc(self, bigram, before, after):
         c, vc = bigram
@@ -690,22 +704,33 @@ class ThoughtProcessor():
 
     def process_is_verb_as(self, _5gram, before, after):
         concept1, sw1, verb, sw2, concept2 = _5gram
-        #relation = get_object_or_None(Relation, name="IsA")
-        #assertion, created = Assertion.objects.get_or_create(
-        #    concept1=concept1,
-        #    relation=relation,
-        #    concept2=concept2)
-        #self.add_assertion(assertion)
         category, created = Category.objects.get_or_create(
             parent=concept2,
             child=concept1)
         self.add_category(category)
         self.reinterpret(before + [category] + after)
 
+
     def process_remove_quote(self, _5gram, before, after):
         verb, c1, punc_quote1, c2, punc_quote2 = _5gram
         print "Removed %s" % c2
         c2.delete()
+
+
+    def _4gram_was_cverb_c(self, _4gram, before, after):
+        c1, sw_was, cverb, c2 = _4gram
+        vc, created = VerbConstruct.objects.get_or_create(
+            concept1=c1,
+            complex_verb=cverb,
+            concept2=c2)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
+
+    def _5gram_was_cverb_c(self, _5gram, before, after):
+        c1, sw_was, cverb, sw_the, c2 = _5gram
+        self._4gram_was_cverb_c([c1, sw_was, cverb, c2], before, after)
+
 
     def process_4gram_alias(self, _4gram, before, after):
         c1, sw_or, c2, sws_isa = _4gram

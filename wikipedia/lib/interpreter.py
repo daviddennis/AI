@@ -1,4 +1,5 @@
 from nltk.stem.wordnet import WordNetLemmatizer
+from django.db.models import Q
 from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.group_manager import GroupManager
@@ -23,6 +24,7 @@ class Interpreter():
         self.word_mgr = WordManager()
         self.thought_processor = None
         self.time_mgr = TimeManager()
+        self.restrict = set()
         self.learned = {}
         self.struct_mgr = None
 
@@ -165,6 +167,8 @@ class Interpreter():
             after = parsed_sentence[i+3:]
             if self.pr.recognize(trigram, "CONCEPT VERB CONCEPT"):
                 self.trigram_verb_construct(trigram, before, after)
+            if self.pr.recognize(trigram, "SWS:is_a NUMBER CONCEPT"):
+                self.trigram_isa_number_c(trigram, before, after)
 
             # List formation
             if self.pr.recognize(trigram, "CONCEPT PUNC:, CONCEPT"):
@@ -368,6 +372,13 @@ class Interpreter():
                     self.add_interpretation(before + [Stopword('THE'), new_concept] + after)
         if self.time_mgr.recognize_time(concept.name):
             self.add_interpretation(before + [Time(concept.name)] + after)
+
+        alias_concepts = self.word_mgr.get_aliases(concept)
+        for ac in alias_concepts:
+            if ac not in self.restrict:
+                self.restrict.add(ac)
+                self.add_interpretation(before + [ac] + after)
+
         # try:
         #     name_or_none = get_object_or_None(PersonName, name=concept.name)
         # except MultipleObjectsReturned:
@@ -574,11 +585,13 @@ class Interpreter():
                 time = Time("%s %s" % (c1_month.name, int(num1.number)), _type="DATE")
                 self.add_interpretation(before + [time] + after)                
 
+
     def bigram_date_year(self, bigram, before, after):
         time, num1 = bigram
         if time.type == "DATE" and not time.year:
             time.add_year(int(num1.number))
             self.add_interpretation(before + [time] + after)
+
 
     def trigram_verb_construct(self, trigram, before, after):
         c1, v1, c2 = trigram
@@ -587,6 +600,13 @@ class Interpreter():
             verb=v1,
             concept2=c2)
         self.add_interpretation(before + [verb_construct] + after)
+
+
+    def trigram_isa_number_c(self, trigram, before, after):
+        sws_isa, num1, c1 = trigram
+        c1.time = Time(int(num1.number))
+        self.add_interpretation(before + [sws_isa, c1] + after)
+
 
     def trigram_and_to_list(self, trigram, before, after):
         c1, sw, c2 = trigram
@@ -676,7 +696,7 @@ class Interpreter():
 
     def trigram_time(self, trigram, before, after):
         sws, time, concept = trigram
-        concept.time_keyword = time.name
+        concept.time = time.name
         self.add_interpretation(before + [sws, concept] + after)
 
     def trigram_v_and_v(self, trigram, before, after):
@@ -989,6 +1009,7 @@ class Interpreter():
                 if isinstance(item, Concept):
                     self.topic = item
                     break
+
 
         # item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
         # for i, item_group in enumerate(item_groups):
