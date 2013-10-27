@@ -48,6 +48,8 @@ class MediumThoughtProcessor():
                 self.bigram_prop_c(bigram, before, after)
             if self.pr.recognize(bigram, "CONCEPT VERBCONSTRUCT"):
                 self.bigram_c_vc(bigram, before, after)
+            if self.pr.recognize(bigram, "CATEGORY QFRAG"):
+                self.bigram_ca_qfrag(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence,
@@ -93,6 +95,8 @@ class MediumThoughtProcessor():
                 self.trigram_ca_prep_c(trigram, before, after)
             if self.pr.recognize(trigram, "VERB SW:the PROPERTY"):
                 self.trigram_verb_the_prop(trigram, before, after)
+            if self.pr.recognize(trigram, "VERBCONSTRUCT ADJ:like LIST"):
+                self.trigram_vc_like_list(trigram, before, after)
 
 
     def process_4grams(self, parsed_sentence):
@@ -173,6 +177,7 @@ class MediumThoughtProcessor():
         self.add_item(new_prop)
         self.reinterpret(before + [new_prop] + after)
 
+
     def bigram_c_vc(self, bigram, before, after):
         c1, vc = bigram
         if not vc.arg1:
@@ -180,6 +185,17 @@ class MediumThoughtProcessor():
             vc.save()
             self.add_item(vc)
             self.reinterpret(before + [vc] + after)
+
+
+    def bigram_ca_qfrag(self, bigram, before, after):
+        ca, qf = bigram
+        if not qf.verb_construct.arg1:
+            vc = self.struct_mgr.copy(VerbConstruct, qf.verb_construct, add={'concept1_id': ca.child_id})
+        elif not qf.verb_construct.arg2:
+            vc = self.struct_mgr.copy(VerbConstruct, qf.verb_construct, add={'concept2_id': ca.child_id})
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
 
     def trigram_group(self, trigram, before, after):
         c1, sws, group = trigram
@@ -371,6 +387,22 @@ class MediumThoughtProcessor():
             property2=_property)
         self.add_item(verb_construct)
         self.reinterpret(before + [verb_construct] + after)
+
+
+    def trigram_vc_like_list(self, trigram, before, after):
+        vc, adj_like, _list = trigram
+        for item in _list:
+            if isinstance(item, Concept):
+                if vc.concept2:
+
+                    ca, created = Category.objects.get_or_create(
+                        parent=vc.concept2,
+                        child=item)
+                    self.add_item(ca)
+                    
+                    new_vc = self.struct_mgr.copy(VerbConstruct, vc, add={'concept2_id': item.id})
+                    self.add_item(new_vc)
+
 
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram

@@ -161,7 +161,11 @@ class ThoughtProcessor():
                 result = self.process_has(item_group, before, after)
                 output += [result]
             if self.pr.recognize(trigram, "CONCEPT SW:and CONCEPT"):
-                self.trigram_c_and_c(trigram, before, after)
+                self.trigram_c_andor_c(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:or CONCEPT"):
+                self.trigram_c_andor_c(trigram, before, after)
+            if self.pr.recognize(trigram, "VERB SW CONCEPT"):
+                self.trigram_verb_sw_c(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT CONCEPT CONCEPT"):
                 self.trigram_ccc(trigram, before, after)
             if self.pr.recognize(trigram, "... SWS:is_not_a ..."):
@@ -1281,10 +1285,21 @@ class ThoughtProcessor():
         self.struct_mgr.add_av(ass=assertion, concept=c2)
         self.add_assertion(assertion)
 
-    def trigram_c_and_c(self, trigram, before, after):
+    def trigram_c_andor_c(self, trigram, before, after):
         c1, sw_and, c2 = trigram
+        _list = List([c1, c2])
+        self.reinterpret(before + [_list] + after)
         self.reinterpret(before + [c1] + after)
         self.reinterpret(before + [c2] + after)
+
+    def trigram_verb_sw_c(self, trigram, before, after):
+        verb, sw, c1 = trigram
+        vc, created = VerbConstruct.objects.get_or_create(
+            concept1=None,
+            verb=verb,
+            concept2=c1)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
 
     def trigram_ccc(self, trigram, before, after):
         c1, c2, c3 = trigram

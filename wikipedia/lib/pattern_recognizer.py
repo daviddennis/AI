@@ -32,7 +32,8 @@ class PatternRecognizer():
             "QUANTIFIER": Quantifier,
             "Q": Quantifier,
             "ALIAS": Alias,
-            "GI": GroupInstance
+            "GI": GroupInstance,
+            "QFRAG": QuestionFragment
             }
 
     def recognize(self, item_list, pattern):

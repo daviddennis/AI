@@ -273,7 +273,7 @@ class VerbConstruct(models.Model):
     
     concept2 = models.ForeignKey(Concept, related_name="verb_2_set", null=True, blank=True)
     amount2 = models.ForeignKey(Amount, related_name="amount_2_set", null=True, blank=True)
-    assertion2 = models.ForeignKey(Adjective, related_name="vc_adj_2_set", null=True, blank=True)
+    assertion2 = models.ForeignKey(Assertion, related_name="vc_adj_2_set", null=True, blank=True)
     question_fragment2 = models.ForeignKey('QuestionFragment', related_name="qf_2_set", null=True, blank=True)
     verb_construct2 = models.ForeignKey('self', related_name='vc_2_set', null=True, blank=True)
     property2 = models.ForeignKey('Property', related_name='vc_prop_2_set', null=True, blank=True)

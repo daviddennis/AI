@@ -61,3 +61,17 @@ class StructureManager():
         return None
         
         
+    def copy(self, cls, instance, add={}):
+
+        kwargs = instance.__dict__
+
+        for key, val in kwargs.items():
+            if key.startswith('_'):
+                del kwargs[key]
+        del kwargs['id']
+
+        kwargs.update(add)
+
+        new_instance, created = cls.objects.get_or_create(**kwargs)
+
+        return new_instance
