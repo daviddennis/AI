@@ -12,6 +12,7 @@ from wikipedia.lib.query_processor import QueryProcessor
 from wikipedia.lib.question_asker import QuestionAsker
 from wikipedia.lib.struct_mgr import StructureManager
 from wikipedia.lib.auto_translate import translations
+from wikipedia.lib.time_mgr import TimeManager
 from sys import stdout
 from time import sleep
 import sys
@@ -37,14 +38,18 @@ class Command(BaseCommand):
         medium_thought_processor = MediumThoughtProcessor()
         question_asker = QuestionAsker()
         struct_mgr = StructureManager()
+        time_mgr = TimeManager()
 
         nlp_generator.parser = interpreter.parser
         nlp_generator.word_mgr = self.word_mgr
         interpreter.thought_processor = thought_processor
         interpreter.causation = causation
         interpreter.struct_mgr = struct_mgr
+        interpreter.time_mgr = time_mgr
         thought_processor.struct_mgr = struct_mgr
+        thought_processor.time_mgr = time_mgr
         medium_thought_processor.struct_mgr = struct_mgr
+        medium_thought_processor.time_mgr = time_mgr
         question_asker.nlp_generator = nlp_generator
         question_asker.word_mgr = self.word_mgr
         question_asker.query_mgr = query_mgr

@@ -28,20 +28,26 @@ class TimeManager():
     def get_date_range(self):
         pass
 
-    def is_day(self, number):
-        if isinstance(number, Number):
-            if number.number > 0 and number.number <= 31:
-                return True
+    def is_day(self, item):
+        if isinstance(item, Number):
+            if isinstance(item.number, int):
+                if item.number >= 1 and item.number <= 31:
+                    return True
         return False
 
-    def is_month(self, concept):
-        if isinstance(concept, Concept):
-            if concept.name in self.month_names or concept.name in self.short_month_names:
+    def is_month(self, item):
+        if isinstance(item, Concept):
+            if item.name in self.month_names or item.name in self.short_month_names:
                 return True
+        if isinstance(item, Number):
+            if isinstance(item.number, int):
+                if item.number >= 1 and item.number <= 12:
+                    return True
         return False
 
     def is_year(self, number):
         if isinstance(number, Number):
-            if number.number >= 0 and number.number < 10000:
-                return True
+            if isinstance(number.number, int):
+                if number.number >= 1500 and number.number < 3500:
+                    return True
         return False

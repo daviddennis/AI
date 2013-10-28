@@ -8,6 +8,7 @@ class QuestionAsker():
         self.nlp_generator = None
         self.word_mgr = None
         self.query_mgr = None
+        self.q_all = Quantifier.objects.get(name="ALL")
 
     def ask_question(self, items=[]):
         have_question = False
@@ -25,13 +26,16 @@ class QuestionAsker():
                 verb_constructs = VerbConstruct.objects.filter(concept1=parent).all()
                 if verb_constructs:
                     for vc in verb_constructs:
+                        # Question to ask
                         hypothetical_vc = VerbConstruct(
                             concept1=child,
                             complex_verb=vc.complex_verb,
                             verb=vc.verb,
                             concept2=vc.concept2)
 
+                        # Check answered
                         if not VerbConstruct.objects.filter(
+                            quantifier__in=[self.q_all, None],
                             concept1=child,
                             complex_verb=vc.complex_verb,
                             verb=vc.verb,

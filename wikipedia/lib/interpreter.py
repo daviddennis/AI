@@ -23,7 +23,7 @@ class Interpreter():
         self.topic = None
         self.word_mgr = WordManager()
         self.thought_processor = None
-        self.time_mgr = TimeManager()
+        self.time_mgr = None
         self.restrict = set()
         self.learned = {}
         self.struct_mgr = None
@@ -263,6 +263,8 @@ class Interpreter():
                 self._5gram_by(_5gram, before, after)
             if self.pr.recognize(_5gram, "PREP:on CONCEPT NUMBER PUNC:, NUMBER"):
                 self._5gram_date(_5gram, before, after)
+            if self.pr.recognize(_5gram, "NUMBER PUNC:/ NUMBER PUNC:/ NUMBER"):
+                self._5gram_long_slash_date(_5gram, before, after)
             #if self.pr.recognize(_5gram, "VERB PREP CONCEPT PREP CONCEPT"):  ### spoke on island of corsica - not working
             #    self._5gram_break_complex_verb(_5gram, before, after)
 
@@ -544,7 +546,7 @@ class Interpreter():
             time = Time("%s %s" % (int(number.number), concept.name))
             self.add_interpretation(before + [time] + after)
 
-        if number.number.is_integer() and number.number < 1000:
+        if isinstance(number.number, int) and number.number < 1000:
             concept = self.word_mgr.get_singular_concept(concept)
             _list = List([concept for i in xrange(int(number.number))])
             self.add_interpretation(before + [_list] + after)
@@ -813,6 +815,13 @@ class Interpreter():
                 date = Time("%s %s %s" % (c1_month.name, int(number_day.number), int(number_year.number)), _type="DATE")
                 self.add_item(date)
                 self.add_interpretation(before + [prep_on, date] + after)
+
+    def _5gram_long_slash_date(self, _5gram, before, after):
+        n1, punc_slash1, n2, punc_slash2, n3 = _5gram
+        if self.time_mgr.is_month(n1) and self.time_mgr.is_day(n2) and self.time_mgr.is_year(n3):
+            time = Time("%s/%s/%s" % (n1.number, n2.number, n3.number), _type="DATE")
+            self.add_item(time)
+            self.add_interpretation(before + [time] + after)
 
     def _5gram_break_complex_verb(self, _5gram, before, after):
         verb, prep1, c1, prep2, c2 = _5gram

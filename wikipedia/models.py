@@ -171,6 +171,8 @@ class Adjective(models.Model):
 
 
 class Assertion(models.Model):
+    #quantifier = models.ForeignKey('Quantifier', null=True, blank=True)
+
     concept1 = models.ForeignKey(Concept, related_name="assertion_1_set", null=True, blank=True)
     property1 = models.ForeignKey('Property', related_name="ass_prop_1_set", null=True, blank=True)
 
@@ -181,6 +183,9 @@ class Assertion(models.Model):
     context = models.ForeignKey(Context, related_name="assertion_context_set", null=True, blank=True)
     
     def __unicode__(self):
+        output = ""
+        #if self.quantifier:
+        #    output += "%s+" % (self.quantifier)
         output = "%s %s " % (self.concept1 or self.property1, self.relation)
         values = self.ass_value_set.all()
         if values:
@@ -287,6 +292,8 @@ class VerbConstruct(models.Model):
     
     time = models.CharField(max_length=200, null=True, blank=True)
     
+    verb_form = None
+
     @property
     def arg1(self):
         return self.concept1 or self.amount1 or self.property1#or self.assertion1
@@ -304,7 +311,15 @@ class VerbConstruct(models.Model):
         output = ''
 
         if self.verb:
-            verb_name = self.verb.name
+            if self.verb.form:
+                if self.verb.form.lower() == "past":
+                    verb_name = self.verb.past_name
+                elif self.verb.form.lower() == "participle":
+                    verb_name = self.verb.participle_name
+                elif self.verb.form.lower() == "s":
+                    verb_name = self.verb.s_form
+            else:
+                verb_name = self.verb.name
         elif self.complex_verb:
             verb_name = str(self.complex_verb)
 
@@ -534,10 +549,20 @@ class Time():
         self.year =  None
 
         if self.type == "DATE":
-            tokens = self.name.split(' ')
-            if len(tokens) == 2:
-                self.month = tokens[0]
-                self.day = tokens[1]
+            if ' ' in self.name:
+                tokens = self.name.split(' ')
+                if len(tokens) == 2:
+                    self.month = tokens[0]
+                    self.day = tokens[1]
+            elif '/' in self.name:
+                tokens = self.name.split('/')
+                if len(tokens) == 2:
+                    self.month = tokens[0]
+                    self.year = tokens[1]
+                if len(tokens) == 3:
+                    self.month = tokens[0]
+                    self.day = tokens[1]
+                    self.year = tokens[2]
 
     def add_adj(self, adj):
         if self.adj == None:

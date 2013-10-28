@@ -17,6 +17,7 @@ class ThoughtProcessor():
         self.pr = PatternRecognizer()
         self.word_mgr = WordManager()
         self.struct_mgr = None
+        self.time_mgr = None
         self.learned = {}
         self.interpretations = []
 
@@ -124,6 +125,8 @@ class ThoughtProcessor():
                 self.bigram_percent(bigram, before, after)
             if self.pr.recognize(bigram, "ADJ TIME"):
                 self.bigram_adj_time(bigram, before, after)
+            if self.pr.recognize(bigram, "VERB CONCEPT"):
+                self.bigram_v_c_to_vc(bigram, before, after)
 
 
     def process_trigrams(self, parsed_sentence):
@@ -161,6 +164,8 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT VERB:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(trigram, "NUMBER PUNC:/ NUMBER"):
+                self.trigram_date_nn(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:of CONCEPT"):
                 self.trigram_c_group(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT PREP:of CONCEPT"):
@@ -288,6 +293,8 @@ class ThoughtProcessor():
                 self.process_4gram_that(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT SW:was CVERB CONCEPT"):
                 self._4gram_was_cverb_c(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT|PROPERTY PUNC:' SW:s ADJ"):
+                self._4gram_c_adj_prop(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CONCEPT VERB SW:the LIST"):
             #    self._4gram_vc_list(_4gram, before, after)
 
@@ -615,6 +622,15 @@ class ThoughtProcessor():
         time.add_adj(adj)
         self.reinterpret(before + [time] + after)
 
+    def bigram_v_c_to_vc(self, bigram, before, after):
+        v, c = bigram
+        vc = self.struct_mgr.new_vc(VerbConstruct(
+                verb=v,
+                concept2=c))
+        vc.verb_form = v.form
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
         if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
@@ -747,6 +763,23 @@ class ThoughtProcessor():
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
 
+
+    def _4gram_c_adj_prop(self, _4gram, before, after):
+        c1_or_prop, punc_quote, sw_s, adj = _4gram
+        c2 = get_object_or_None(Concept, name=adj.name)
+        if c2:
+            if isinstance(c1_or_prop, Concept):
+                c1 = c1_or_prop
+                prop, created = Property.objects.get_or_create(
+                    parent=c1,
+                    key_concept=c2)
+                self.add_item(prop)
+                self.reinterpret(before + [prop] + after)
+            elif isinstance(c1_or_prop, Property):
+                prop = c1_or_prop
+                new_prop = prop.add_subprop(concept=c2)
+                self.add_item(new_prop)
+                self.reinterpret(before + [new_prop] + after)
 
     def _5gram_was_cverb_c(self, _5gram, before, after):
         c1, sw_was, cverb, sw_the, c2 = _5gram
@@ -1276,21 +1309,22 @@ class ThoughtProcessor():
         self.reinterpret(before + [verb_construct] + after)        
 
     def process_trigram_c_isa_ass(self, item_group, before, after):
+        return
         c1, sws_isa, ass1 = item_group
-        relation = get_object_or_None(Relation, name="HasProperty")
-        assertion, created = Assertion.objects.get_or_create(
-            concept1=c1,
-            relation=relation)
+        #relation = get_object_or_None(Relation, name="HasProperty")
+        #assertion, created = Assertion.objects.get_or_create(
+        #    concept1=c1,
+        #    relation=relation)
             #concept2=None,
             #adj2=None)
-        if ass1.concept2:
-            self.struct_mgr.add_av(ass=assertion, concept=concept2)
+        #if ass1.concept2:
+        #    self.struct_mgr.add_av(ass=assertion, concept=concept2)
         #    assertion.concept2 = ass1.concept2
-        elif ass1.adj2:
-            self.struct_mgr.add_av(ass=assertion, adj=adj2)
+        #elif ass1.adj2:
+        #    self.struct_mgr.add_av(ass=assertion, adj=adj2)
         #    assertion.adj2 = ass1.adj2
-        self.add_item(assertion)
-        self.reinterpret(before + [c1, sws_isa, ass1.concept1] + after)
+        #self.add_item(assertion)
+        #self.reinterpret(before + [c1, sws_isa, assertion] + after)
 
     def process_trigram_c_isnota_c(self, item_group, before, after):
         c1, isnota, c2 = item_group
@@ -1302,6 +1336,14 @@ class ThoughtProcessor():
         self.struct_mgr.add_av(ass=assertion, concept=c2)
         self.add_assertion(assertion)
 
+
+    def trigram_date_nn(self, trigram, before, after):
+        n1, punc_slash, n2 = trigram
+        if self.time_mgr.is_month(n1) and self.time_mgr.is_year(n2):
+            time = Time("%s/%s" % (n1.number, n2.number), _type="DATE")
+            self.add_item(time)
+            self.reinterpret(before + [time] + after)
+            
 
     def trigram_c_group(self, trigram, before, after):
         c1, sw_prep_of, c2 = trigram

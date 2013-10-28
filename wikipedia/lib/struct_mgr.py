@@ -129,9 +129,29 @@ class StructureManager():
                 property2=vc.property2,
                 
                 context=vc.context,
-                time=vc.time).all()            
+                time=vc.time).all()         
             vc2 = vc_s[0]
+
+        if vc.verb:
+            vc2.verb_form = vc.verb.form
+        elif vc.complex_verb:
+            vc2.verb_form = vc.complex_verb.verb.form
         return vc2
+        
+    def new_prop(self, prop):
+        try:
+            prop2, created = Property.objects.get_or_create(
+                parent=prop.parent,
+                key_concept=prop.key_concept,
+                sub_prop=prop.sub_prop)
+        except MultipleObjectsReturned:
+            props = Property.objects.filter(
+                parent=prop.parent,
+                key_concept=prop.key_concept,
+                sub_prop=prop.sub_prop).all()
+            prop2 = props[0]
+
+        return prop2
         
         
     def copy(self, cls, instance, add={}):

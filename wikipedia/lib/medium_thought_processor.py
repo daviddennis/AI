@@ -14,6 +14,7 @@ class MediumThoughtProcessor():
         self.interpretations = []
         self.learned = {}
         self.struct_mgr = None
+        self.time_mgr = None
         
     def process_thought(self, parsed_sentence, thinker=None):
         if thinker:
