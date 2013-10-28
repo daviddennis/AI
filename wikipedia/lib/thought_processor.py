@@ -3,6 +3,7 @@ from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.lib.utils import get_or_create_or_delete
+from wikipedia.lib.quick_lists import group_words
 from wikipedia.models import *
 from django.db.models.loading import get_model
 import operator
@@ -160,12 +161,18 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT VERB:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(trigram, "CONCEPT SW:of CONCEPT"):
+                self.trigram_c_group(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT PREP:of CONCEPT"):
+                self.trigram_c_group(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:and CONCEPT"):
                 self.trigram_c_andor_c(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:or CONCEPT"):
                 self.trigram_c_andor_c(trigram, before, after)
             if self.pr.recognize(trigram, "VERB SW CONCEPT"):
                 self.trigram_verb_sw_c(trigram, before, after)
+            if self.pr.recognize(trigram, "CONCEPT SW:is CONCEPT:someone"):
+                self.trigram_c_is_someone(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT CONCEPT CONCEPT"):
                 self.trigram_ccc(trigram, before, after)
             if self.pr.recognize(trigram, "... SWS:is_not_a ..."):
@@ -821,7 +828,7 @@ class ThoughtProcessor():
         self.add_verb_construct(verb_construct)
 
     def process_cvca(self, parsed_sentence):
-        c1, verb, c2, adj, x = tuple(parsed_sentence)
+        c1, verb, c2, adj, x = tuple(parsed_sentence[:5])
         relation = get_object_or_None(Relation, name='HasProperty')
         assertion, created = Assertion.objects.get_or_create(
            concept1=c2,
@@ -1285,12 +1292,32 @@ class ThoughtProcessor():
         self.struct_mgr.add_av(ass=assertion, concept=c2)
         self.add_assertion(assertion)
 
+
+    def trigram_c_group(self, trigram, before, after):
+        c1, sw_prep_of, c2 = trigram
+        if c1.name in group_words:
+            grp, created = Group.objects.get_or_create(
+                parent_concept=None,
+                child_concept=self.word_mgr.get_singular_concept(c2))
+            self.add_item(grp)
+            self.reinterpret(before + [grp] + after)
+
+
     def trigram_c_andor_c(self, trigram, before, after):
         c1, sw_and, c2 = trigram
         _list = List([c1, c2])
         self.reinterpret(before + [_list] + after)
         self.reinterpret(before + [c1] + after)
         self.reinterpret(before + [c2] + after)
+
+    def trigram_c_is_someone(self, trigram, before, after):
+        c1, sw_is, c2 = trigram
+        person_c = get_object_or_None(Concept, name="PERSON")
+        ca, created = Category.objects.get_or_create(
+            parent=person_c,
+            child=c1)
+        self.add_item(ca)
+        self.reinterpret(before + [ca] + after)
 
     def trigram_verb_sw_c(self, trigram, before, after):
         verb, sw, c1 = trigram

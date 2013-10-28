@@ -50,6 +50,8 @@ class MediumThoughtProcessor():
                 self.bigram_c_vc(bigram, before, after)
             if self.pr.recognize(bigram, "CATEGORY QFRAG"):
                 self.bigram_ca_qfrag(bigram, before, after)
+            if self.pr.recognize(bigram, "VERBCONSTRUCT CONCEPT"):
+                self.bigram_vc_c(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence,
@@ -97,6 +99,11 @@ class MediumThoughtProcessor():
                 self.trigram_verb_the_prop(trigram, before, after)
             if self.pr.recognize(trigram, "VERBCONSTRUCT ADJ:like LIST"):
                 self.trigram_vc_like_list(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY SWS:which_was VERB|CVERB"):
+                self.trigram_ca_was_verb(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY SWS:that_was VERB|CVERB"):
+                self.trigram_ca_was_verb(trigram, before, after)
+        
 
 
     def process_4grams(self, parsed_sentence):
@@ -196,15 +203,31 @@ class MediumThoughtProcessor():
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
 
+        
+    def bigram_vc_c(self, bigram, before, after):
+        vc, c1 = bigram
+        if not vc.arg2:
+            vc.concept2 = c1
+            vc2 = self.struct_mgr.new_vc(vc)
+            self.add_item(vc2)
+            self.reinterpret(before + [vc2] + after)
 
     def trigram_group(self, trigram, before, after):
         c1, sws, group = trigram
-        group_instance, created = GroupInstance.objects.get_or_create(
-            group=group,
-            parent_concept=group.parent_concept,
-            child_concept=c1)
-        self.add_item(group_instance)
-        self.reinterpret(before + [group_instance] + after)
+        if group.parent_concept:
+            group_instance, created = GroupInstance.objects.get_or_create(
+                group=group,
+                parent_concept=parent,
+                child_concept=c1)
+            self.add_item(group_instance)
+            self.reinterpret(before + [group_instance] + after)
+        else:
+            new_group, created = Group.objects.get_or_create(
+                parent_concept=c1,
+                child_concept=group.child_concept)
+            self.add_item(new_group)
+            self.reinterpret(before + [new_group] + after)
+
 
     def trigram_ca_ass_group(self, trigram, before, after):
         category, sw, assertion = trigram
@@ -391,18 +414,46 @@ class MediumThoughtProcessor():
 
     def trigram_vc_like_list(self, trigram, before, after):
         vc, adj_like, _list = trigram
-        for item in _list:
+        for item in _list.items:
             if isinstance(item, Concept):
                 if vc.concept2:
-
+                    
                     ca, created = Category.objects.get_or_create(
                         parent=vc.concept2,
                         child=item)
                     self.add_item(ca)
                     
-                    new_vc = self.struct_mgr.copy(VerbConstruct, vc, add={'concept2_id': item.id})
+                    new_vc, created = VerbConstruct.objects.get_or_create(
+                        concept1_id=vc.concept1_id,
+                        verb_id=vc.verb_id,
+                        complex_verb_id=vc.complex_verb_id,
+                        concept2_id=item.id, # item id
+                        amount2=vc.amount2,
+                        assertion2=vc.assertion2,
+                        question_fragment2=vc.question_fragment2,
+                        verb_construct2=vc.verb_construct2,
+                        property2=vc.property2)
                     self.add_item(new_vc)
 
+                    #new_vc = self.struct_mgr.copy(VerbConstruct, vc, add={'concept2_id': item.id})
+                    #self.add_item(new_vc)
+
+
+    def trigram_ca_was_verb(self, trigram, before, after):
+        ca, sws_which_that_was, c_verb = trigram
+        verb = c_verb if isinstance(c_verb, Verb) else None
+        cverb = c_verb if isinstance(c_verb, ComplexVerb) else None
+        # vc, created = VerbConstruct.objects.get_or_create(
+        #     concept1=ca.child,
+        #     verb=verb,
+        #     complex_verb=cverb,
+        #     concept2=None)
+        vc = self.struct_mgr.new_vc(VerbConstruct(
+                concept1=ca.child,
+                verb=verb,
+                complex_verb=cverb))
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
 
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram
@@ -496,9 +547,9 @@ class MediumThoughtProcessor():
     def _4gram_thatwas_cv_time(self, _4gram, before, after):
         c1, sws_thatwas, cverb, time = _4gram
         vc, created = VerbConstruct.objects.get_or_create(
-            concept1=c1,
-            complex_verb=cverb,
-            time=time.name)
+           concept1=c1,
+           complex_verb=cverb,
+           time=time.name)        
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
 

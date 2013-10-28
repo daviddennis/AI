@@ -107,7 +107,7 @@ class Group(models.Model):
                                                    self.child_concept,
                                                    self.child_concept)
         else:   
-            val = "%s -> [%s, %s, %s, ...]" % (parent, 
+            val = "%s -> [%s, %s, %s, ...]" % (parent,
                                                self.child_concept, 
                                                self.child_concept,
                                                self.child_concept)
@@ -125,7 +125,11 @@ class GroupInstance(models.Model):
     child_concept = models.ForeignKey(Concept, related_name="child_set")
 
     def __unicode__(self):
-        return "%s -> [%s]" % (self.parent_concept, self.child_concept)
+        if self.parent_concept == self.group.parent_concept:
+            return "%s -> [%s:%s]" % (self.parent_concept, self.group.child_concept, self.child_concept)
+        else:
+            return "%s:%s -> [%s:%s]" % (self.group.parent_concept, self.parent_concept, 
+                                         self.group.child_concept, self.child_concept)
 
 
 class Rank(models.Model):
@@ -267,7 +271,7 @@ class VerbConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
     amount1 = models.ForeignKey(Amount, related_name="amount_1_set", null=True, blank=True)
     #assertion1 = models.ForeignKey(Adjective, related_name="vc_adj_1_set", null=True, blank=True)
-
+    
     verb = models.ForeignKey(Verb, null=True, blank=True)
     complex_verb = models.ForeignKey(ComplexVerb, null=True, blank=True)
     
@@ -277,11 +281,11 @@ class VerbConstruct(models.Model):
     question_fragment2 = models.ForeignKey('QuestionFragment', related_name="qf_2_set", null=True, blank=True)
     verb_construct2 = models.ForeignKey('self', related_name='vc_2_set', null=True, blank=True)
     property2 = models.ForeignKey('Property', related_name='vc_prop_2_set', null=True, blank=True)
-
+    
     context = models.ForeignKey(Context, related_name="verb_context_set", null=True, blank=True)
-
+    
     time = models.CharField(max_length=200, null=True, blank=True)
-
+    
     @property
     def arg1(self):
         return self.concept1 or self.amount1 #or self.assertion1
@@ -464,6 +468,13 @@ class Negation(models.Model):
 
     def __unicode__(self):
         return self.item
+
+
+class Title(models.Model):
+    concept = models.ForeignKey(Concept)
+
+    def __unicode__(self):
+        return self.concept.name
 
 
 # Class SentenceRecord

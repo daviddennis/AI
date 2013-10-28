@@ -54,7 +54,7 @@ class PatternRecognizer():
                 sub_args = arg.split('|')
                 matched = False
                 for sub_arg in sub_args:
-                    cls = self.model_dict.get(model_name)
+                    cls = self.model_dict.get(sub_arg)
                     if cls:
                         if isinstance(item, cls):
                             matched = True
