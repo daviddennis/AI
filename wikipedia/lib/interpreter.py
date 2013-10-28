@@ -595,11 +595,16 @@ class Interpreter():
 
     def trigram_verb_construct(self, trigram, before, after):
         c1, v1, c2 = trigram
-        verb_construct, created = VerbConstruct.objects.get_or_create(
+        #verb_construct, created = VerbConstruct.objects.get_or_create(
+        #    concept1=c1,
+        #    verb=v1,
+        #    concept2=c2)
+        vc = VerbConstruct(
             concept1=c1,
             verb=v1,
             concept2=c2)
-        self.add_interpretation(before + [verb_construct] + after)
+        vc2 = self.struct_mgr.new_vc(vc)
+        self.add_interpretation(before + [vc2] + after)
 
 
     def trigram_isa_number_c(self, trigram, before, after):

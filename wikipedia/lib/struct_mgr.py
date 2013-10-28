@@ -1,4 +1,5 @@
 from wikipedia.models import *
+from django.core.exceptions import MultipleObjectsReturned
 
 class StructureManager():
     
@@ -89,17 +90,47 @@ class StructureManager():
         
 
     def new_vc(self, vc):
-        vc2, created = VerbConstruct.objects.get_or_create(
-            concept1=vc.concept1,
-            amount1=vc.amount1,
-            verb=vc.verb,
-            complex_verb=vc.complex_verb,
-            concept2=vc.concept2,
-            amount2=vc.amount2,
-            assertion2=vc.assertion2,
-            question_fragment2=vc.question_fragment2,
-            verb_construct2=vc.verb_construct2,
-            property2=vc.property2)
+        try:
+            vc2, created = VerbConstruct.objects.get_or_create(
+                quantifier=vc.quantifier,
+                
+                concept1=vc.concept1,
+                amount1=vc.amount1,
+                property1=vc.property1,
+                
+                verb=vc.verb,
+                complex_verb=vc.complex_verb,
+                
+                concept2=vc.concept2,
+                amount2=vc.amount2,
+                assertion2=vc.assertion2,
+                question_fragment2=vc.question_fragment2,
+                verb_construct2=vc.verb_construct2,
+                property2=vc.property2,
+                
+                context=vc.context,
+                time=vc.time)
+        except MultipleObjectsReturned:
+            vc_s = VerbConstruct.objects.filter(
+                quantifier=vc.quantifier,
+                
+                concept1=vc.concept1,
+                amount1=vc.amount1,
+                property1=vc.property1,
+                
+                verb=vc.verb,
+                complex_verb=vc.complex_verb,
+                
+                concept2=vc.concept2,
+                amount2=vc.amount2,
+                assertion2=vc.assertion2,
+                question_fragment2=vc.question_fragment2,
+                verb_construct2=vc.verb_construct2,
+                property2=vc.property2,
+                
+                context=vc.context,
+                time=vc.time).all()            
+            vc2 = vc_s[0]
         return vc2
         
         

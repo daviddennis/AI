@@ -52,6 +52,8 @@ class MediumThoughtProcessor():
                 self.bigram_ca_qfrag(bigram, before, after)
             if self.pr.recognize(bigram, "VERBCONSTRUCT CONCEPT"):
                 self.bigram_vc_c(bigram, before, after)
+            if self.pr.recognize(bigram, "PROPERTY VERBCONSTRUCT"):
+                self.bigram_prop_vc(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence,
@@ -212,15 +214,30 @@ class MediumThoughtProcessor():
             self.add_item(vc2)
             self.reinterpret(before + [vc2] + after)
 
+    def bigram_prop_vc(self, bigram, before, after):
+        prop, vc = bigram
+        if not vc.arg1:
+            vc.property1 = prop
+            new_vc = self.struct_mgr.new_vc(vc)
+            self.add_item(new_vc)
+            self.reinterpret(before + [new_vc] + after)
+
     def trigram_group(self, trigram, before, after):
         c1, sws, group = trigram
         if group.parent_concept:
-            group_instance, created = GroupInstance.objects.get_or_create(
-                group=group,
-                parent_concept=parent,
-                child_concept=c1)
-            self.add_item(group_instance)
-            self.reinterpret(before + [group_instance] + after)
+            if self.word_mgr.is_a(c1, group.parent_concept):
+                new_group, created = Group.objects.get_or_create(
+                    parent_concept=c1,
+                    child_concept=group.child_concept)
+                self.add_item(new_group)
+                self.reinterpret(before + [new_group] + after)
+            elif self.word_mgr.is_a(c1, group.child_concept):
+                group_instance, created = GroupInstance.objects.get_or_create(
+                    group=group,
+                    parent_concept=group.parent_concept,
+                    child_concept=c1)
+                self.add_item(group_instance)
+                self.reinterpret(before + [group_instance] + after)
         else:
             new_group, created = Group.objects.get_or_create(
                 parent_concept=c1,

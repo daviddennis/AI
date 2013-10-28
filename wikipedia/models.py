@@ -271,7 +271,8 @@ class VerbConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="verb_1_set", null=True, blank=True)
     amount1 = models.ForeignKey(Amount, related_name="amount_1_set", null=True, blank=True)
     #assertion1 = models.ForeignKey(Adjective, related_name="vc_adj_1_set", null=True, blank=True)
-    
+    property1 = models.ForeignKey('Property', related_name='vc_prop_1_set', null=True, blank=True)
+
     verb = models.ForeignKey(Verb, null=True, blank=True)
     complex_verb = models.ForeignKey(ComplexVerb, null=True, blank=True)
     
@@ -288,7 +289,7 @@ class VerbConstruct(models.Model):
     
     @property
     def arg1(self):
-        return self.concept1 or self.amount1 #or self.assertion1
+        return self.concept1 or self.amount1 or self.property1#or self.assertion1
 
     @property
     def arg2(self):

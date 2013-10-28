@@ -35,7 +35,7 @@ class QuestionAsker():
                             concept1=child,
                             complex_verb=vc.complex_verb,
                             verb=vc.verb,
-                            concept2=vc.concept2).count():
+                            concept2=vc.concept2).count() and vc.concept2:
 
                             q_path = [vc]
                             answer = {

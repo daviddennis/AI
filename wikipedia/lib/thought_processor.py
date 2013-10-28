@@ -559,6 +559,16 @@ class ThoughtProcessor():
             self.reinterpret(before + [gi] + after)
             self.reinterpret(before + [gi.parent_concept] + after)
 
+        # Group -> Property
+        if Group.objects.filter(
+            parent_concept=c1,
+            child_concept=c2).all():
+            prop, created = Property.objects.get_or_create(
+                parent=c1,
+                key_concept=c2)
+            self.add_item(prop)
+            self.reinterpret(before + [prop] + after)
+
     def bigram_c_vc(self, bigram, before, after):
         c, vc = bigram
         if not vc.arg1:
@@ -1493,15 +1503,17 @@ class ThoughtProcessor():
 
     def process_verb(self, triple, before, after):
         concept1, verb, concept2 = triple
-        verb_construct, created = VerbConstruct.objects.get_or_create(
+        vc = VerbConstruct(
             concept1=concept1,
             verb=verb,
             concept2=concept2,
             context=self.get_context())
+        vc2 = self.struct_mgr.new_vc(vc)        
         #            print concept1,verb,concept2,'!!!'
         #            sys.exit()
-        self.add_verb_construct(verb_construct)
-        return verb_construct
+        self.add_item(vc2)
+        self.reinterpret(before + [vc2] + after)
+        return vc2
 
     def process_complex_verb_pp(self, trigram, before, after):
         verb, prep1, prep2 = trigram
