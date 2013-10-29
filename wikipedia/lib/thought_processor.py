@@ -3,7 +3,8 @@ from wikipedia.lib.parser import Parser
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.word_mgr import WordManager
 from wikipedia.lib.utils import get_or_create_or_delete
-from wikipedia.lib.quick_lists import group_words
+from wikipedia.lib.quick_lists import group_words, q_words
+from wikipedia.lib.utils import safe_get_or_create
 from wikipedia.models import *
 from django.db.models.loading import get_model
 import operator
@@ -31,6 +32,7 @@ class ThoughtProcessor():
         self.process_4grams(parsed_sentence)
         self.process_5grams(parsed_sentence)
         self.process_6grams(parsed_sentence)
+        self.process_7grams(parsed_sentence)
 
         if self.pr.recognize(parsed_sentence, "CONCEPT SW:is VERB:use SW:to CONCEPT"):
             self.process_used_to(parsed_sentence)
@@ -127,6 +129,12 @@ class ThoughtProcessor():
                 self.bigram_adj_time(bigram, before, after)
             if self.pr.recognize(bigram, "VERB CONCEPT"):
                 self.bigram_v_c_to_vc(bigram, before, after)
+            if self.pr.recognize(bigram, "CVERB CONCEPT"):
+                self.bigram_cverb_c(bigram, before, after)
+            if self.pr.recognize(bigram, "... ..."):
+                self.bigram_big_c(bigram, before, after)
+            #if self.pr.recognize(bigram, "SW CONCEPT"):
+            #    self.bigram_cverb_c(bigram, before, after)
 
 
     def process_trigrams(self, parsed_sentence):
@@ -164,6 +172,8 @@ class ThoughtProcessor():
             if self.pr.recognize(item_group, "CONCEPT VERB:has CONCEPT"):
                 result = self.process_has(item_group, before, after)
                 output += [result]
+            if self.pr.recognize(trigram, "SW:the CONCEPT VERBCONSTRUCT"):
+                self.trigram_vc_prop(trigram, before, after)
             if self.pr.recognize(trigram, "NUMBER PUNC:/ NUMBER"):
                 self.trigram_date_nn(trigram, before, after)
             if self.pr.recognize(trigram, "CONCEPT SW:of CONCEPT"):
@@ -220,6 +230,10 @@ class ThoughtProcessor():
                 self.trigram_prop_value(trigram, before, after)
             if self.pr.recognize(trigram, "ADJ SWS:is_a CONCEPT"):
                 self.trigram_adj_isa_c(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY SW VERBCONSTRUCT"):
+                self.trigram_ca_sw_vc(trigram, before, after)
+            if self.pr.recognize(trigram, "... ... ..."):
+                self.trigram_big_c(trigram, before, after)
             if self.pr.recognize(item_group, "CONCEPT SW:on CONCEPT"):
                 result = self.process_on(item_group, before, after)
                 output += [result]
@@ -353,25 +367,40 @@ class ThoughtProcessor():
                 self._6gram_aka(_6gram, before, after)
             
 
+    def process_7grams(self, parsed_sentence):
+        _7grams = [(t,u,v,w,x,y,z) for t,u,v,w,x,y,z in zip(parsed_sentence, 
+                                                            parsed_sentence[1:], 
+                                                            parsed_sentence[2:],
+                                                            parsed_sentence[3:],
+                                                            parsed_sentence[4:],
+                                                            parsed_sentence[5:],
+                                                            parsed_sentence[6:])]
+        for i, _7gram in enumerate(_7grams):
+            before = parsed_sentence[:i]
+            after = parsed_sentence[i+7:]
+            if self.pr.recognize(_7gram, "... CONCEPT SW:is ADJ:different PREP:from ... CONCEPT"):
+                self._7gram_word_sense(_7gram, before, after)
+
+
     def process_c_is_a_c_on_the_c_of_c(self, parsed_sentence):
         c1, sws1, c2, sws2, c3, sw, c4 = parsed_sentence
         category, created = Category.objects.get_or_create(
             parent=c2,
             child=c1)
-        self.add_category(category)
+        self.add_item(category)
         category, created = Category.objects.get_or_create(
             parent=c3,
             child=c4)
-        self.add_category(category)
+        self.add_item(category)
         group, created = Group.objects.get_or_create(
             parent_concept=c3,
             child_concept=c2)
-        self.add_group(group)
+        self.add_item(group)
         group_instance, created = GroupInstance.objects.get_or_create(
             group=group,
             parent_concept=c4,
             child_concept=c1)
-        self.add_group_instance(group_instance)
+        self.add_item(group_instance)
 
     def process_c_v_and_v_c(self, parsed_sentence):
         c1, verb1, sw, verb2, c2 = parsed_sentence
@@ -418,7 +447,7 @@ class ThoughtProcessor():
                     group=group,
                     parent_concept=c3,
                     child_concept=c1)
-                self.add_group_instance(group_instance)
+                self.add_item(group_instance)
 
     def process_to(self, parsed_sentence):
         c1, verb1, c2, to, verb2, c3 = parsed_sentence[:6]
@@ -631,9 +660,28 @@ class ThoughtProcessor():
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
 
+    def bigram_cverb_c(self, bigram, before, after):
+        cverb, c1 = bigram
+        vc = self.struct_mgr.new_vc(VerbConstruct(
+                complex_verb=cverb,
+                concept2=c1))
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
+
+    def bigram_big_c(self, bigram, before, after):
+        x1, x2 = bigram
+        try:
+            c = get_object_or_None(Concept, name="%s %s" % (x1, x2))
+            if c:
+                self.reinterpret(before + [c] + after)
+        except:
+            pass
+
+
     def process_bigram_question_fragment(self, bigram, before, after):
         sw, verb_construct = bigram
-        if sw.name in "WHO WHAT WHEN WHERE WHY HOW WHICH CAN".split(' '):
+        if sw.name in q_words:
             q_frag, created = QuestionFragment.objects.get_or_create(
                 q_word=sw.name,
                 verb_construct=verb_construct)
@@ -722,16 +770,16 @@ class ThoughtProcessor():
         concept1, sws1, adj, concept2, sws2, concept3 = tuple(parsed_sentence[:6])
         category, created = Category.objects.get_or_create(parent=concept2,
                                                            child=concept1)
-        self.add_category(category)
+        self.add_item(category)
         group, created = Group.objects.get_or_create(
             parent_concept=concept3,
             child_concept=concept2)        
-        self.add_group(group)
+        self.add_item(group)
         group_instance, created = GroupInstance.objects.get_or_create(
             group=group,
             parent_concept=concept3,
             child_concept=concept1)
-        self.add_group_instance(group_instance)
+        self.add_item(group_instance)
         if adj.form == 'superlative':
             rank, created = Rank.objects.get_or_create(
                 group_instance=group_instance,
@@ -744,7 +792,7 @@ class ThoughtProcessor():
         category, created = Category.objects.get_or_create(
             parent=concept2,
             child=concept1)
-        self.add_category(category)
+        self.add_item(category)
         self.reinterpret(before + [category] + after)
 
 
@@ -1067,6 +1115,26 @@ class ThoughtProcessor():
             rank=number.number)
         self.add_item(rank)
 
+
+    def _7gram_word_sense(self, _7gram, before, after):
+        x1, c2, sw_is, adj, prep, x2, c4 = _7gram
+        try:
+            c1 = get_object_or_None(Concept, name=x1.name)
+            c3 = get_object_or_None(Concept, name=x2.name)
+        except:
+            pass
+        
+        if c1 and c3:
+            ws1, created = safe_get_or_create(Sense,
+                                              concept=c2,
+                                              sense_concept=c1)
+            self.add_item(ws1)
+            ws2, created = safe_get_or_create(Sense,
+                                              concept=c4,
+                                              sense_concept=c3)
+            self.add_item(ws2)
+        
+
     def process_show_mind(self, item_group, before, after):
         print self.thinker.computer_mind
         
@@ -1256,12 +1324,34 @@ class ThoughtProcessor():
         if c1:
             self.reinterpret(before + [c1, sws, c] + after)
 
+
+    def trigram_ca_sw_vc(self, trigram, before, after):
+        ca, sw, vc = trigram
+        if sw.name in q_words:
+            qf, created = QuestionFragment.objects.get_or_create(
+                q_word=sw.name,
+                verb_construct=vc)
+            ca.qf_s.add(qf)
+            ca.save()
+            self.add_item(ca)
+            self.reinterpret(before + [ca] + after)
+
+    def trigram_big_c(self, trigram, before, after):
+        x1, x2, x3 = trigram
+        try:
+            c = get_object_or_None(Concept, name="%s %s %s" % (x1, x2, x3))
+            if c:
+                self.reinterpret(before + [c] + after)
+        except:
+            pass
+
     def process_on(self, triple, before, after):
         concept1, sw, concept2 = triple
         group, created = Group.objects.get_or_create(
             parent_concept=concept2,
             child_concept=self.word_mgr.get_singular_concept(concept1))
         self.add_group(group)
+
 
     def process_of_the(self, trigram, before, after):
         c1, sws, c2 = trigram
@@ -1335,6 +1425,15 @@ class ThoughtProcessor():
             #concept2=c2)
         self.struct_mgr.add_av(ass=assertion, concept=c2)
         self.add_assertion(assertion)
+
+
+    def trigram_vc_prop(self, trigram, before, after):
+        sw_the, c1, vc = trigram
+        prop, created = Property.objects.get_or_create(
+            parent_vc=vc,
+            key_concept=c1)
+        self.add_item(prop)
+        self.reinterpret(before + [prop] + after)
 
 
     def trigram_date_nn(self, trigram, before, after):
@@ -1436,9 +1535,12 @@ class ThoughtProcessor():
 
     def process_trigram_property_of(self, item_group, before, after):
         c1, sw_of, c2 = item_group
-        _property, created = Property.objects.get_or_create(
-            parent=c2,
-            key_concept=c1)
+        #_property, created = Property.objects.get_or_create(
+        #    parent=c2,
+        #    key_concept=c1)
+        _property = get_or_create_or_delete(Property,
+                                            parent=c2,
+                                            key_concept=c1)
         self.add_item(_property)
         self.reinterpret(before + [_property] + after)
         self.reinterpret(before + [c2] + after)
@@ -1573,7 +1675,8 @@ class ThoughtProcessor():
         group, created = Group.objects.get_or_create(
             parent_concept=c1,
             child_concept=c2)
-        self.add_group(group)
+        self.add_item(group)
+        self.reinterpret(before + [group] + after)
 
     def process_verb_amount(self, triple, before, after):
         concept1, verb, amount2 = triple

@@ -1,7 +1,7 @@
 import itertools
 from django.db import models
 from django.dispatch import receiver
-from wikipedia.lib.utils import autoconnect_to_signals
+from wikipedia.lib.utils import autoconnect_to_signals, safe_get_or_create
 
 class Concept(models.Model):
     name = models.CharField(db_index=True, max_length=1000)
@@ -11,15 +11,21 @@ class Concept(models.Model):
     stats_status = models.CharField(max_length=200, default="needs update", null=False)
     url = models.CharField(max_length=2000, null=True)
 
+    sense = None
+
     time = None
 
     hit = 0
 
     def __unicode__(self):
+        output = ""
         if self.time:
-            return '%s at %s' % (self.name, self.time)
+            output += '%s at %s' % (self.name, self.time)
         else:
-            return self.name
+            output += self.name
+        if self.sense:
+            output += " (%s)" % self.sense.sense_concept
+        return output
 
     #def with_category(self):
     #    return '%s is a %s' % (self.name, self.category.name)
@@ -41,6 +47,13 @@ class Alias(models.Model):
     def __unicode__(self):
         return '%s = %s' % (self.concept1, self.concept2)
 
+class Sense(models.Model):
+    concept = models.ForeignKey(Concept, related_name="sense_c_set")
+    sense_concept = models.ForeignKey(Concept, related_name="sense_sense_set")
+
+    def __unicode__(self):
+        return "%s (%s)" % (self.concept, self.sense_concept)
+
 class Context(models.Model):
     concept = models.ForeignKey(Concept, related_name="context_set")
     
@@ -51,8 +64,19 @@ class Category(models.Model):
     parent = models.ForeignKey(Concept, related_name="instance_set")
     child = models.ForeignKey(Concept, related_name="category_set")
 
+    qf_s = models.ManyToManyField('QuestionFragment', null=True, blank=True)
+    #assertions = models.ManyToManyField('Assertion', null=True, blank=True)
+
     def __unicode__(self):
-        return "%s is a type of %s" % (self.child, self.parent)
+        output = "%s is a type of" % self.child
+        #assertions = self.assertions.all()
+        #if assertions:
+        #    output += " " + str([x. assertions)
+        output += " " + str(self.parent)
+        qf_s = self.qf_s.all()
+        if qf_s:
+            output += " " + str(qf_s)
+        return output
 
 # class ConceptType(models.Model):
 #     concept = models.ForeignKey(Concept, related_name="ctype_c_set")
@@ -82,6 +106,8 @@ class StopwordSequence(models.Model):
 
 class Group(models.Model):
 
+    quantifier = models.ForeignKey('Quantifier', null=True, blank=True)
+
     parent_property = models.ForeignKey('Property', null=True, blank=True)
     parent_concept = models.ForeignKey(Concept, related_name="abstract_parent_set", null=True, blank=True)
 
@@ -90,24 +116,27 @@ class Group(models.Model):
     size = models.IntegerField(null=True, blank=True)
 
     def __unicode__(self):
+        val = ""
+        if self.quantifier:
+            val += "%s+" % self.quantifier
         parent = self.parent_concept or self.parent_property
         if self.size:
             if self.size == 3:
-                val = "%s -> [%s, %s, %s]" % (parent, 
+                val += "%s -> [%s, %s, %s]" % (parent, 
                                               self.child_concept, 
                                               self.child_concept,
                                               self.child_concept)
             elif self.size == 2:
-                val = "%s -> [%s, %s]" % (parent, 
+                val += "%s -> [%s, %s]" % (parent, 
                                           self.child_concept, 
                                           self.child_concept)
             else:
-                val = "%s -> [%s, %s, %s, ...]" % (parent, 
+                val += "%s -> [%s, %s, %s, ...]" % (parent, 
                                                    self.child_concept, 
                                                    self.child_concept,
                                                    self.child_concept)
         else:   
-            val = "%s -> [%s, %s, %s, ...]" % (parent,
+            val += "%s -> [%s, %s, %s, ...]" % (parent,
                                                self.child_concept, 
                                                self.child_concept,
                                                self.child_concept)
@@ -181,7 +210,7 @@ class Assertion(models.Model):
     score = models.IntegerField(null=True, blank=True)
     frequency = models.FloatField(null=True, blank=True)
     context = models.ForeignKey(Context, related_name="assertion_context_set", null=True, blank=True)
-    
+
     def __unicode__(self):
         output = ""
         #if self.quantifier:
@@ -204,9 +233,12 @@ class AssertionValue(models.Model):
     concept = models.ForeignKey(Concept, related_name="ass_c_value_set", null=True, blank=True)
     adj = models.ForeignKey(Adjective, related_name="ass_adj_value_set", null=True, blank=True)
 
+    @property                            
+    def arg2(self):
+        return self.concept or self.adj
+
     def __unicode__(self):
-        value = self.concept or self.adj
-        return str(value)
+        return str(self.arg2)
 
 
 # NL Structure
@@ -362,29 +394,38 @@ class IfStmt(models.Model):
 
 class QuestionFragment(models.Model):
     q_word = models.CharField(max_length=50)
-    verb_construct = models.ForeignKey(VerbConstruct)
-
+    verb_construct = models.ForeignKey(VerbConstruct, null=True, blank=True)
+    prep_construct = models.ForeignKey('PrepConstruct', null=True, blank=True)
+    
     def __unicode__(self):
-        return "%s-%s" % (self.q_word, self.verb_construct)
+        if self.verb_construct:
+            return "%s-%s" % (self.q_word, self.verb_construct)
+        elif self.prep_construct:
+            return "%s-%s" % (self.q_word, self.prep_construct)
 
 
 class PrepConstruct(models.Model):
     concept1 = models.ForeignKey(Concept, related_name="pc_c_1_set", null=True, blank=True)
     vc1 = models.ForeignKey(VerbConstruct, related_name="pc_vc_1_set", null=True, blank=True)
+    property1 = models.ForeignKey('Property', related_name="pc_prop_1_set", null=True, blank=True)
     
     preposition = models.ForeignKey(Preposition)
 
     concept2 = models.ForeignKey(Concept, related_name="pc_2_set")
 
+    @property
+    def arg1(self):
+        return self.concept1 or self.vc1 or self.property1
+
     def __unicode__(self):
-        arg1 = self.concept1 or self.vc1
-        return "%s %s %s" % (arg1, 
+        return "%s %s %s" % (self.arg1, 
                              self.preposition.name.lower(),
                              self.concept2)
 
 
 class Property(models.Model):
-    parent = models.ForeignKey(Concept, related_name="prop_parent_set")
+    parent = models.ForeignKey(Concept, related_name="prop_parent_set", null=True, blank=True)
+    parent_vc = models.ForeignKey(VerbConstruct, null=True, blank=True)
 
     key_concept = models.ForeignKey(Concept, related_name="prop_key_set")
 
@@ -396,21 +437,29 @@ class Property(models.Model):
             raise Exception('No add subprop prop handling')
 
         if concept:
-            new_sp, created = Property.objects.get_or_create(
-                parent=self.key_concept,
-                key_concept=concept)
-            prop, created = Property.objects.get_or_create(
-                parent=self.parent,
-                key_concept=self.key_concept,
-                sub_prop=new_sp)
+            new_sp, created = safe_get_or_create(Property,
+                                                 parent=self.key_concept,
+                                                 key_concept=concept)
+            prop, created = safe_get_or_create(Property,
+                                               parent=self.parent,
+                                               key_concept=self.key_concept,
+                                               sub_prop=new_sp)
+            #new_sp, created = Property.objects.get_or_create(
+            #    parent=self.key_concept,
+            #    key_concept=concept)
+            #prop, created = Property.objects.get_or_create(
+            #    parent=self.parent,
+            #    key_concept=self.key_concept,
+            #    sub_prop=new_sp)
             return prop
 
     def __unicode__(self):
         output = ""
+        parent = self.parent or self.parent_vc
         if self.sub_prop:
-            output = "%s-%s" % (self.parent, self.sub_prop)
+            output = "%s-%s" % (parent, self.sub_prop)
         else:
-            output = "%s-%s" % (self.parent, self.key_concept)
+            output = "%s-%s" % (parent, self.key_concept)
         if self.pv_set:
             values = [x.value for x in self.pv_set.all()]
             if len(values) > 1:
@@ -491,6 +540,22 @@ class Title(models.Model):
 
     def __unicode__(self):
         return self.concept.name
+
+
+# class Definition(models.Model):
+#     concept = models.ForeignKey(Concept)
+
+#     vc = models.ForeignKey(VerbConstruct, related_name="def_vc_set", null=True, blank=True)
+#     pc = models.ForeignKey(PrepConstruct, related_name="def_pc_set", null=True, blank=True)
+#     ass = models.ForeignKey(Assertion, related_name="def_ass_set", null=True, blank=True)
+#     prop = models.ForeignKey(Assertion, related_name="def_prop_set", null=True, blank=True)
+    
+#     @property
+#     def definition(self):
+#         return self.vc or self.pc or self.ass or self.prop
+
+#     def __unicode__(self):
+#         return "%s DEFINITION: %s" % (self.concept, self.definition)
 
 
 # Class SentenceRecord

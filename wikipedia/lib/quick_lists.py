@@ -7,3 +7,5 @@ gw3 = set("collection conglomerate congregation coterie crew formation gathering
 gw4 = set("pack platoon posse pool suite".upper().split(' '))
 
 group_words = gw1 | gw2 | gw3 | gw4
+
+q_words = set("WHO WHAT WHEN WHERE WHY HOW WHICH CAN THAT".split(' '))

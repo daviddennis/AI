@@ -33,10 +33,18 @@ class PatternRecognizer():
             "Q": Quantifier,
             "ALIAS": Alias,
             "GI": GroupInstance,
-            "QFRAG": QuestionFragment
+            "QFRAG": QuestionFragment,
+            "PREPCONSTRUCT": PrepConstruct,
+            "PC": PrepConstruct
             }
+        self.patterns = set()
 
     def recognize(self, item_list, pattern):
+
+        # if pattern in self.patterns:
+        #     raise Exception("Redundant pattern: %s" % pattern)
+        # else:
+        #     self.patterns.add(pattern)
 
         args = pattern.split(' ')
         for i, arg in enumerate(args):

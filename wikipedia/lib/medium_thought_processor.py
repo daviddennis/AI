@@ -1,5 +1,7 @@
 from wikipedia.lib.pattern_recognizer import PatternRecognizer
 from wikipedia.lib.word_mgr import WordManager
+from wikipedia.lib.quick_lists import q_words
+from wikipedia.lib.utils import safe_get_or_create
 from wikipedia.models import *
 import operator
 import sys
@@ -55,6 +57,8 @@ class MediumThoughtProcessor():
                 self.bigram_vc_c(bigram, before, after)
             if self.pr.recognize(bigram, "PROPERTY VERBCONSTRUCT"):
                 self.bigram_prop_vc(bigram, before, after)
+            if self.pr.recognize(bigram, "QUANTIFIER GROUP"):
+                self.bigram_quantifier_group(bigram, before, after)
 
     def process_trigrams(self, parsed_sentence):
         trigrams = [(x,y,z) for x,y,z in zip(parsed_sentence,
@@ -90,6 +94,8 @@ class MediumThoughtProcessor():
                 self.trigram_p_v_amount(trigram, before, after)
             if self.pr.recognize(trigram, "PROPERTY PREP PROPERTY"):
                 self.trigram_ppp(trigram, before, after)
+            if self.pr.recognize(trigram, "PROPERTY PREP CONCEPT"):
+                self.trigram_ppc(trigram, before, after)
             if self.pr.recognize(trigram, "CPREP SWS:is_a ASSERTION"):
                 self.trigram_cprep_isa_ass(trigram, before, after)
             if self.pr.recognize(trigram, "VERBCONSTRUCT PREP CONCEPT"):
@@ -106,6 +112,8 @@ class MediumThoughtProcessor():
                 self.trigram_ca_was_verb(trigram, before, after)
             if self.pr.recognize(trigram, "CATEGORY SWS:that_was VERB|CVERB"):
                 self.trigram_ca_was_verb(trigram, before, after)
+            if self.pr.recognize(trigram, "CATEGORY SW PREPCONSTRUCT"):
+                self.trigram_ca_sw_pc(trigram, before, after)
         
 
 
@@ -200,9 +208,13 @@ class MediumThoughtProcessor():
     def bigram_ca_qfrag(self, bigram, before, after):
         ca, qf = bigram
         if not qf.verb_construct.arg1:
-            vc = self.struct_mgr.copy(VerbConstruct, qf.verb_construct, add={'concept1_id': ca.child_id})
+            qf.verb_construct.concept1 = ca.child
+            vc = self.struct_mgr.new_vc(qf.verb_construct)
+            #vc = self.struct_mgr.copy(VerbConstruct, qf.verb_construct, add={'concept1_id': ca.child_id})
         elif not qf.verb_construct.arg2:
-            vc = self.struct_mgr.copy(VerbConstruct, qf.verb_construct, add={'concept2_id': ca.child_id})
+            qf.verb_construct.concept2 = ca.child
+            vc = self.struct_mgr.new_vc(qf.verb_construct)
+            #vc = self.struct_mgr.copy(VerbConstruct, qf.verb_construct, add={'concept2_id': ca.child_id})
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
 
@@ -222,6 +234,14 @@ class MediumThoughtProcessor():
             new_vc = self.struct_mgr.new_vc(vc)
             self.add_item(new_vc)
             self.reinterpret(before + [new_vc] + after)
+
+
+    def bigram_quantifier_group(self, bigram, before, after):
+        q, grp = bigram
+        grp.quantifier = q
+        grp.save()
+        self.reinterpret(before + [grp] + after)
+
 
     def trigram_group(self, trigram, before, after):
         c1, sws, group = trigram
@@ -361,6 +381,15 @@ class MediumThoughtProcessor():
         self.add_item(pc)
         self.reinterpret(before + [pc] + after)
 
+    def trigram_ppc(self, trigram, before, after):
+        prop, prep, c1 = trigram
+        pc, created = safe_get_or_create(PrepConstruct,
+                                         property1=prop,
+                                         preposition=prep,
+                                         concept2=c1)
+        self.add_item(pc)
+        self.reinterpret(before + [pc] + after)
+
     # TODO: FIX!!!
     def trigram_cprep_isa_ass(self, trigram, before, after):
         cprep, sws_isa, assertion = trigram
@@ -472,6 +501,19 @@ class MediumThoughtProcessor():
                 complex_verb=cverb))
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
+
+
+    def trigram_ca_sw_pc(self, trigram, before, after):
+        ca, sw, pc = trigram
+        if sw.name in q_words:
+            qf, created = QuestionFragment.objects.get_or_create(
+                q_word=sw.name,
+                prep_construct=pc)
+            ca.qf_s.add(qf)
+            ca.save()
+            self.add_item(ca)
+            self.reinterpret(before + [ca] + after)
+
 
     def _4gram_cverb(self, _4gram, before, after):
         c1, sw, cverb, c2 = _4gram

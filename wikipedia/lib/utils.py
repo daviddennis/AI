@@ -40,3 +40,15 @@ def get_or_create_or_delete(cls, **kwargs):
                 print 'Deleted 1 %s' % cls.__name__
     
     return obj, created
+
+def safe_get_or_create(cls, **kwargs):
+    obj = None
+    created = False
+    try:
+        obj, created = cls.objects.get_or_create(**kwargs)
+    except MultipleObjectsReturned:
+        print 'MultipleObjectsReturned!!!'
+        all_cls = cls.objects.filter(**kwargs).all()
+        obj = all_cls[0]
+    
+    return obj, created

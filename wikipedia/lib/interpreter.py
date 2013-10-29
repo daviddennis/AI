@@ -74,9 +74,7 @@ class Interpreter():
                 self.unigram_an(unigram, before, after)
             if self.pr.recognize([unigram], "SW"):
                 self.unigram_quantifier(unigram, before, after)
-            if self.pr.recognize([unigram], "SW"):
                 self.unigram_prep(unigram, before, after)
-            if self.pr.recognize([unigram], "SW"):
                 self.unigram_anaphora(unigram, before, after)
             if self.pr.recognize([unigram], "SW:my"):
                 self.unigram_my(unigram, before, after)
