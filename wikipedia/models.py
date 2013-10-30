@@ -512,10 +512,11 @@ class Name(models.Model):
     prep_construct = models.ForeignKey(PrepConstruct, related_name="name_pc_set", null=True, blank=True)
     verb_construct = models.ForeignKey(VerbConstruct, related_name="name_vc_set", null=True, blank=True)
     group_instance = models.ForeignKey(GroupInstance, related_name="name_gi_set", null=True, blank=True)
+    prop = models.ForeignKey(Property, related_name="name_prop_set", null=True, blank=True)
 
     @property
     def arg2(self):
-        return self.entity or self.prep_construct or self.verb_construct or self.group_instance
+        return self.entity or self.prep_construct or self.verb_construct or self.group_instance or self.prop
     
     def __unicode__(self):
         return "(%s) name for (%s)" % (self.concept, self.arg2)
@@ -707,3 +708,15 @@ class List():
         #             output = "%s(%s, %s)" % (verb_name, item1, self.verb_construct2)
         #         else:
         #             output = "%s(%s)" % (verb_name, (item1 or self.concept2).name)
+
+class QuotedItem():
+
+    def __init__(self, items):
+        self.items = items
+
+    @property
+    def name(self):
+        return ' '.join([x.name for x in self.items])
+
+    def __repr__(self):
+        return "QuotedItem: '%s'" % self.name

@@ -404,16 +404,19 @@ class ThoughtProcessor():
 
     def process_c_v_and_v_c(self, parsed_sentence):
         c1, verb1, sw, verb2, c2 = parsed_sentence
-        verb_construct, created = VerbConstruct.objects.get_or_create(
+        vc, created = VerbConstruct.objects.get_or_create(
             concept1=c1,
             verb=verb1,
             concept2=c2)
-        self.add_verb_construct(verb_construct)
-        verb_construct, created = VerbConstruct.objects.get_or_create(
+        self.add_item(vc)
+        #self.correct(vc)
+        vc, created = VerbConstruct.objects.get_or_create(
             concept1=c1,
             verb=verb2,
             concept2=c2)
-        self.add_verb_construct(verb_construct)
+        self.add_item(vc)
+        #self.correct(vc)
+        
     
     def process_alias(self, parsed_sentence):
         alias, c1, sw, c2 = parsed_sentence
@@ -461,6 +464,8 @@ class ThoughtProcessor():
             concept2=c3)
         self.add_verb_construct(verb_construct1)
         self.add_verb_construct(verb_construct2)
+        #self.correct(verb_construct1)
+        #self.correct
         #self.process_if([Stopword('IF'), verb_construct1, Stopword('THEN'), verb_construct2])
 
     def process_prep(self, parsed_sentence):
@@ -474,7 +479,7 @@ class ThoughtProcessor():
                 concept1=c1,
                 complex_verb=complex_verb,
                 concept2=v2_as_concept)
-            self.add_verb_construct(verb_construct)
+            self.add_item(verb_construct)
             
     def process_amount(self, amount, before, after):
         self.remember(amount)
@@ -1657,6 +1662,7 @@ class ThoughtProcessor():
         #            sys.exit()
         self.add_item(vc2)
         self.reinterpret(before + [vc2] + after)
+        self.correct(vc2)
         return vc2
 
     def process_complex_verb_pp(self, trigram, before, after):
@@ -1763,6 +1769,16 @@ class ThoughtProcessor():
         if interpretation not in self.interpretations:
             self.process_thought(interpretation)
             self.interpretations += [interpretation]
+
+    def correct(self, new):
+        if not new:
+            raise Exception('No new item specified in correction')
+
+        print "--> Correction: %s" % [new]
+        self.interpretations = [x for x in self.interpretations if new in x]
+
+        new_key_name = new.__class__.__name__.lower() + 's'
+        self.learned[new_key_name] = [new]
 
     def get_interpretations(self):
         return self.interpretations

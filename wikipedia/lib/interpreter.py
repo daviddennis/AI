@@ -241,6 +241,10 @@ class Interpreter():
                 self._4gram_verb_and(_4gram, before, after)
             if self.pr.recognize(_4gram, "PREP:on CONCEPT NUMBER NUMBER"):
                 self._4gram_date(_4gram, before, after)
+            if self.pr.recognize(_4gram, "PUNC:' ... ... PUNC:'"):
+                self._4gram_quoted_item(_4gram, before, after)
+            if self.pr.recognize(_4gram, "... PUNC:' SW:s CONCEPT"):
+                self._4gram_x_to_c(_4gram, before, after)
 
     def interpret_5grams(self, parsed_sentence):
         _5grams = [(v,w,x,y,z) for v,w,x,y,z in zip(parsed_sentence, 
@@ -783,6 +787,25 @@ class Interpreter():
                 self.add_item(date)
                 self.add_interpretation(before + [prep_on, date] + after)
 
+    def _4gram_quoted_item(self, _4gram, before, after):
+        punc1, x1, x2, punc2 = _4gram
+        qi = QuotedItem([x1,x2])
+        self.add_item(qi)
+        self.add_interpretation(before + [qi] + after)
+
+    def _4gram_x_to_c(self, _4gram, before, after):
+        x, punc, sw_s, c2 = _4gram
+        if isinstance(x, Concept):
+            return
+        c1 = None
+        try:
+            c1 = get_object_or_None(Concept, name=x.name)
+        except:
+            pass
+        if c1:
+            self.add_interpretation(before + [c1, punc, sw_s, c2] + after)
+            self.correct(c1)
+
     def _5gram_small_list_3(self, _5gram, before, after):
         concept1, punc, concept2, sw, concept3 = _5gram
         _list = List([concept1, concept2, concept3])
@@ -980,6 +1003,13 @@ class Interpreter():
                     i += 1
 
 
+    def correct(self, new):
+        if not new:
+            raise Exception('No new item specified in correction')
+
+        print "--> Correction: %s" % [new]
+        self.interpretations = [x for x in self.interpretations if new in x]
+
     def add_interpretation(self, interpretation, recurse=True):
         if len(self.interpretations) > 5000:
             self.print_once("> 5000 interpretations")
@@ -1021,24 +1051,3 @@ class Interpreter():
                 if isinstance(item, Concept):
                     self.topic = item
                     break
-
-
-        # item_groups = [(x,y,z) for x,y,z in zip(parsed_sentence, parsed_sentence[1:], parsed_sentence[2:])]
-        # for i, item_group in enumerate(item_groups):
-        #     before = parsed_sentence[:i]
-        #     after = parsed_sentence[i+3:]
-        #     print item_group
-        #     if self.pr.recognize(item_group, "SW:the CONCEPT"):
-        #         self.the(item_group, before, after)
-            #if self.pr.recognize(item_group, 'PUNC:" CONCEPT PUNC:"'):
-            #    self.quotes(item_group, before, after, thinker)
-            # if self.pr.recognize(item_group, "CONCEPT VERB"):
-            #     self._verb(item_group, before, after)
-            # if self.pr.recognize(item_group, "CONCEPT SWS CONCEPT"):
-            #     stopword_sequence = item_group[1]
-            #     if stopword_sequence.string.upper() == "is the".upper():
-            #         self.is_the(item_group, before, after)
-            #     if stopword_sequence.string.upper() == "is a".upper():
-            #         self.is_a(item_group, before, after)
-            #     if stopword_sequence.string.upper() in group_stopword_seqs:
-            #         self.on_the(item_group, before, after)
