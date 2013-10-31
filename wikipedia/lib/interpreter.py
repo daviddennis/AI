@@ -68,18 +68,34 @@ class Interpreter():
                 self.unigram_double_quote(unigram, before, after)
             if self.pr.recognize([unigram], "NAME"):
                 self.unigram_name(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:am"):
-                self.unigram_am(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:an"):
-                self.unigram_an(unigram, before, after)
             if self.pr.recognize([unigram], "SW"):
                 self.unigram_quantifier(unigram, before, after)
                 self.unigram_prep(unigram, before, after)
                 self.unigram_anaphora(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:am"):
+                self.unigram_am(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:an"):
+                self.unigram_an(unigram, before, after)
             if self.pr.recognize([unigram], "SW:my"):
                 self.unigram_my(unigram, before, after)
             if self.pr.recognize([unigram], "SW:you"):
                 self.unigram_you(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:it"):
+                self.unigram_it(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:so"):
+                self.unigram_so(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:we"):
+                self.unigram_we(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:i"):
+                self.unigram_i(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:are"):
+                self.unigram_are(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:can"):
+                self.unigram_exclude_word(unigram, before, after)
+            if self.pr.recognize([unigram], "SW:will"):
+                self.unigram_exclude_word(unigram, before, after)
+            if self.pr.recognize([unigram], "SWS:was_an"):
+                self.unigram_was_an(unigram, before, after)
             if self.pr.recognize([unigram], "SWS:was_a"):
                 self.unigram_was_a(unigram, before, after)
             if self.pr.recognize([unigram], "SWS:are_a"):
@@ -88,26 +104,10 @@ class Interpreter():
                 self.unigram_on_then(unigram, before, after)
             if self.pr.recognize([unigram], "SWS"):
                 self.unigram_sws(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:are"):
-                self.unigram_are(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:it"):
-                self.unigram_it(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:so"):
-                self.unigram_so(unigram, before, after)
-            if self.pr.recognize([unigram], "SWS:was_an"):
-                self.unigram_was_an(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:i"):
-                self.unigram_i(unigram, before, after)
             if self.pr.recognize([unigram], "CONCEPT"):
                 self.unigram_concept(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:can"):
-                self.unigram_exclude_word(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:will"):
-                self.unigram_exclude_word(unigram, before, after)
             if self.pr.recognize([unigram], "CONCEPT:the_way"):
                 self.unigram_exclude_word(unigram, before, after)
-            if self.pr.recognize([unigram], "SW:we"):
-                self.unigram_we(unigram, before, after)
             if self.pr.recognize([unigram], "PUNC:,"):
                 self.unigram_comma(unigram, before, after)
             if self.pr.recognize([unigram], "VERB"):
