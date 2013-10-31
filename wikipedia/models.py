@@ -199,6 +199,13 @@ class Adjective(models.Model):
             return self.name
 
 
+class Adverb(models.Model):
+    name = models.CharField(max_length=50)
+
+    def __unicode__(self):
+        return self.name
+
+
 class Assertion(models.Model):
     #quantifier = models.ForeignKey('Quantifier', null=True, blank=True)
 
@@ -291,14 +298,22 @@ class Verb(models.Model):
 
 class ComplexVerb(models.Model):
     verb = models.ForeignKey(Verb)
-    preposition = models.ForeignKey(Preposition)
+    preposition = models.ForeignKey(Preposition, null=True, blank=True)
     prep2 = models.ForeignKey(Preposition, related_name="prep2_set", null=True, blank=True)
+    adverb = models.ForeignKey(Adverb, related_name="cverb_adverb_set", null=True, blank=True)
 
     def __unicode__(self):
+        output = str(self.verb)
+
+        if self.preposition:
+            output += " %s" % self.preposition
         if self.prep2:
-            return "%s %s %s" % (self.verb.name, self.preposition.name, self.prep2.name)
-        else:
-            return "%s %s" % (self.verb.name, self.preposition.name)
+            output += " %s" % self.prep2
+        if self.adverb:
+            output += " %s" % self.adverb
+
+        return output
+        
 
 # NL Structure
 @autoconnect_to_signals

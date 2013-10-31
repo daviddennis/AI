@@ -68,19 +68,24 @@ class Parser():
                                 #    before += [items[0]]
                                 #    remaining = items[1:]
                                 #else:
-                                items, success = self.parse_adjective(item, tags)
+                                items, success = self.parse_adverb(item, tags)
                                 if success:
                                     before += [items[0]]
                                     remaining = items[1:]
                                 else:
-                                    items, success = self.parse_concept(item)
+                                    items, success = self.parse_adjective(item, tags)
                                     if success:
                                         before += [items[0]]
                                         remaining = items[1:]
                                     else:
-                                        subitems = self.tokenize(items[0])
-                                        before += [subitems[0]]
-                                        remaining += [' '.join(subitems[1:])]
+                                        items, success = self.parse_concept(item)
+                                        if success:
+                                            before += [items[0]]
+                                            remaining = items[1:]
+                                        else:
+                                            subitems = self.tokenize(items[0])
+                                            before += [subitems[0]]
+                                            remaining += [' '.join(subitems[1:])]
                                         
             if remaining == ['']:
                 latest = before
@@ -188,6 +193,23 @@ class Parser():
             adjective = get_object_or_None(Adjective, name=tokens[0])
         if adjective:
             return ([adjective] + [' '.join(tokens[1:])], True)
+        else:
+            return ([item], False)
+
+
+    def parse_adverb(self, item, tags=None):
+        tokens = self.tokenize(item)
+
+        if tags:
+            for word, pos_tag in tags:
+                if 'NN' in pos_tag and word == tokens[0]:
+                    return ([item], False)
+                if 'V' in pos_tag and word == tokens[0]:
+                    return ([item], False)                
+
+        adverb = get_object_or_None(Adverb, name=tokens[0])
+        if adverb:
+            return ([adverb] + [' '.join(tokens[1:])], True)
         else:
             return ([item], False)
 

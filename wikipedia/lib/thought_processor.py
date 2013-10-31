@@ -131,6 +131,12 @@ class ThoughtProcessor():
                 self.bigram_v_c_to_vc(bigram, before, after)
             if self.pr.recognize(bigram, "CVERB CONCEPT"):
                 self.bigram_cverb_c(bigram, before, after)
+            if self.pr.recognize(bigram, "CONCEPT CVERB"):
+                self.bigram_c_cverb(bigram, before, after)
+            if self.pr.recognize(bigram, "CVERB ADVERB"):
+                self.bigram_cverb_averb(bigram, before, after)
+            if self.pr.recognize(bigram, "VERB ADVERB"):
+                self.bigram_verb_averb(bigram, before, after)
             if self.pr.recognize(bigram, "... ..."):
                 self.bigram_big_c(bigram, before, after)
             #if self.pr.recognize(bigram, "SW CONCEPT"):
@@ -673,6 +679,30 @@ class ThoughtProcessor():
         self.add_item(vc)
         self.reinterpret(before + [vc] + after)
 
+
+    def bigram_c_cverb(self, bigram, before, after):
+        c1, cverb = bigram
+        vc, created = safe_get_or_create(VerbConstruct,
+                                         concept1=c1,
+                                         complex_verb=cverb)
+        self.add_item(vc)
+        self.reinterpret(before + [vc] + after)
+
+
+    def bigram_cverb_averb(self, bigram, before, after):
+        cverb, adv = bigram
+        cverb2, created = safe_get_or_create(ComplexVerb,
+                                             verb=cverb.verb,
+                                             preposition=cverb.preposition,
+                                             adverb=adv)
+        self.reinterpret(before + [cverb2] + after)
+
+    def bigram_verb_averb(self, bigram, before, after):
+        verb, adv = bigram
+        cverb, created = safe_get_or_create(ComplexVerb,
+                                            verb=verb,
+                                            adverb=adv)
+        self.reinterpret(before + [cverb] + after)
 
     def bigram_big_c(self, bigram, before, after):
         x1, x2 = bigram
@@ -1543,7 +1573,7 @@ class ThoughtProcessor():
         #_property, created = Property.objects.get_or_create(
         #    parent=c2,
         #    key_concept=c1)
-        _property = get_or_create_or_delete(Property,
+        _property, created = get_or_create_or_delete(Property,
                                             parent=c2,
                                             key_concept=c1)
         self.add_item(_property)
@@ -1767,6 +1797,7 @@ class ThoughtProcessor():
 
     def reinterpret(self, interpretation):
         if interpretation not in self.interpretations:
+            print interpretation,'+'
             self.process_thought(interpretation)
             self.interpretations += [interpretation]
 

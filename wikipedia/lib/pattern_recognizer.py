@@ -35,7 +35,8 @@ class PatternRecognizer():
             "GI": GroupInstance,
             "QFRAG": QuestionFragment,
             "PREPCONSTRUCT": PrepConstruct,
-            "PC": PrepConstruct
+            "PC": PrepConstruct,
+            "ADVERB": Adverb
             }
         self.patterns = set()
 
