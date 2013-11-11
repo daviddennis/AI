@@ -17,20 +17,30 @@ class Concept(models.Model):
 
     hit = 0
 
+    the = False
+    a = False
+
+    pos = None
+
     def __unicode__(self):
         output = ""
+        name = self.name
+        if self.a:
+            if name[0] in "AEIOU".split():
+                output += "AN "
+            else:
+                output += "A "
+        if self.the:
+            output += "THE "
         if self.time:
-            output += '%s at %s' % (self.name, self.time)
+            output += '%s at %s' % (name, self.time)
         else:
-            output += self.name
+            output += name
         if self.sense:
             output += " (%s)" % self.sense.sense_concept
         return output
 
-    #def with_category(self):
-    #    return '%s is a %s' % (self.name, self.category.name)
 
-    pos = None
 
 class Connection(models.Model):
     conceptA = models.ForeignKey(Concept, related_name="concept_a_set")
@@ -468,6 +478,13 @@ class Property(models.Model):
             #    sub_prop=new_sp)
             return prop
 
+    @property
+    def num_sub_props(self):
+        num = 0
+        if self.sub_prop:
+            num += 1 + self.sub_prop.num_sub_props
+        return num
+        
     def __unicode__(self):
         output = ""
         parent = self.parent or self.parent_vc
@@ -479,8 +496,9 @@ class Property(models.Model):
             values = [x.value for x in self.pv_set.all()]
             if len(values) > 1:
                 output += " = " + str(values)
-            elif values:
-                output += " = " + str(values[0])
+            else:
+                if values:
+                    output += " = " + str(values[0])
         return output
 
 

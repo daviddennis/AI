@@ -301,8 +301,6 @@ class ThoughtProcessor():
                 self.process_complex_verb_list(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT VERB PREP CONCEPT"):
                 self.process_basic_prep(_4gram, before, after)
-            if self.pr.recognize(_4gram, "CONCEPT PUNC:' SW:s CONCEPT"):
-                self.process_4gram_property(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT VERB:has SW:a CONCEPT"):
                 self.process_4gram_property_had(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT VERB:has SW:an CONCEPT"):
@@ -311,10 +309,16 @@ class ThoughtProcessor():
                 self.process_4gram_alias(_4gram, before, after)
             if self.pr.recognize(_4gram, "CATEGORY SW:that CONCEPT VERB"):
                 self.process_4gram_that(_4gram, before, after)
+            if self.pr.recognize(_4gram, "PROPERTY PUNC:' SW:s CONCEPT"):
+                self._4gram_prop_s_c(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT SW:was CVERB CONCEPT"):
                 self._4gram_was_cverb_c(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT PUNC:' SW:s CONCEPT"):
+               self.process_4gram_property(_4gram, before, after)
             if self.pr.recognize(_4gram, "CONCEPT|PROPERTY PUNC:' SW:s ADJ"):
-                self._4gram_c_adj_prop(_4gram, before, after)
+               self._4gram_c_adj_prop(_4gram, before, after)
+            if self.pr.recognize(_4gram, "CONCEPT PUNC:' SW:s ..."):
+                self._4gram_c_s_unknown(_4gram, before, after)
             #if self.pr.recognize(_4gram, "CONCEPT VERB SW:the LIST"):
             #    self._4gram_vc_list(_4gram, before, after)
 
@@ -837,6 +841,14 @@ class ThoughtProcessor():
         c2.delete()
 
 
+    def _4gram_prop_s_c(self, _4gram, before, after):
+        prop, punc, sw_s, c1 = _4gram
+        new_prop = prop.add_subprop(concept=c1)
+        self.add_item(new_prop)
+        self.remove_item(prop)
+        self.reinterpret(before + [new_prop] + after)
+
+
     def _4gram_was_cverb_c(self, _4gram, before, after):
         c1, sw_was, cverb, c2 = _4gram
         vc, created = VerbConstruct.objects.get_or_create(
@@ -862,7 +874,14 @@ class ThoughtProcessor():
                 prop = c1_or_prop
                 new_prop = prop.add_subprop(concept=c2)
                 self.add_item(new_prop)
+                self.remove_item(prop)
                 self.reinterpret(before + [new_prop] + after)
+
+    def _4gram_c_s_unknown(self, _4gram, before, after):
+        c1, punc, sw_s, x1 = _4gram
+        c2 = get_object_or_None(Concept, name=x1)
+        if c2:
+            self.process_4gram_property([c1, punc, sw_s, c2], before, after)
 
     def _5gram_was_cverb_c(self, _5gram, before, after):
         c1, sw_was, cverb, sw_the, c2 = _5gram
@@ -1426,7 +1445,7 @@ class ThoughtProcessor():
 
     def process_trigram_v_the_c(self, item_group, before, after):
         verb, sw_the, c2 = item_group
-        verb_construct, created = VerbConstruct.objects.get_or_create(
+        verb_construct, created = safe_get_or_create(VerbConstruct,
             concept1=None,
             verb=verb,
             concept2=c2)
@@ -1507,7 +1526,7 @@ class ThoughtProcessor():
 
     def trigram_verb_sw_c(self, trigram, before, after):
         verb, sw, c1 = trigram
-        vc, created = VerbConstruct.objects.get_or_create(
+        vc, created = safe_get_or_create(VerbConstruct,
             concept1=None,
             verb=verb,
             concept2=c1)
@@ -1794,10 +1813,24 @@ class ThoughtProcessor():
         self.learned[key_name] = self.learned.get(key_name, [])
         if item not in self.learned.get(key_name, []):
             self.learned[key_name] += [item]
+        self.manage_preferences(item)
+
+
+    def manage_preferences(self, item):
+        key_name = item.__class__.__name__.lower() + 's'
+        if isinstance(item, Property):
+            prop = item
+            num_sub_props = prop.num_sub_props
+            for p in self.learned.get(key_name, []):
+                if p.num_sub_props < num_sub_props:
+                    self.remove_item(p)
+                else:
+                    break
+                    
 
     def reinterpret(self, interpretation):
         if interpretation not in self.interpretations:
-            print interpretation,'+'
+            #print interpretation,'+'
             self.process_thought(interpretation)
             self.interpretations += [interpretation]
 
@@ -1810,6 +1843,12 @@ class ThoughtProcessor():
 
         new_key_name = new.__class__.__name__.lower() + 's'
         self.learned[new_key_name] = [new]
+
+    def remove_item(self, item):
+        key_name = item.__class__.__name__.lower() + 's'
+        if item in self.learned.get(key_name):
+            self.learned[key_name] = [x for x in self.learned[key_name] if x != item]
+                    
 
     def get_interpretations(self):
         return self.interpretations

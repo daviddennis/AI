@@ -13,6 +13,7 @@ from wikipedia.lib.question_asker import QuestionAsker
 from wikipedia.lib.struct_mgr import StructureManager
 from wikipedia.lib.auto_translate import translations
 from wikipedia.lib.time_mgr import TimeManager
+from wikipedia.lib.pref_mgr import PreferenceManager
 from sys import stdout
 from time import sleep
 import sys
@@ -88,6 +89,8 @@ class Command(BaseCommand):
             sentence_list = [sentence]
             parsed_sentence = interpreter.parser.parse(sentence_list, tags=tags)
 
+            print parsed_sentence
+
             interpretations = interpreter.interpret(parsed_sentence, thinker=self)
             interpreter.clear_interpretations()
 
@@ -96,13 +99,15 @@ class Command(BaseCommand):
 
             num_interpretations = len(interpretations)
             print '# interpretations: %s' % num_interpretations
+
+            all_learned = {}
             
             for x in interpretations[:100]:
                 shortest_interpretations += [x]
-                print x
+                #print x
 
-            if interpretations:
-                print '----'*5 + ' FIRST LEVEL'
+            #if interpretations:
+            #    print '----'*5 + ' FIRST LEVEL'
             thoughts = []
             for interpretation in interpretations:
                 thought_processor.process_thought(interpretation, thinker=self)
@@ -110,33 +115,40 @@ class Command(BaseCommand):
                 thought_processor.clear_interpretations()
 
             for key, val in thought_processor.learned.iteritems():
-                print key,':',val
+                #print key,':',val
+                all_learned[key] = all_learned.get(key, []) + val
             #print thought_processor.learned.values()
             learned_items |= set([x for y in thought_processor.learned.values() for x in y])
             thought_processor.learned = {}
 
             if thoughts:
-                print '----'*5 + ' SECOND LEVEL'
-                for thought in thoughts[:100]:
+                #print '----'*5 + ' SECOND LEVEL'
+                #for thought in thoughts[:100]:
                     #if isinstance(thought[0], Category):
-                    print thought
+                    #print thought
+                    #all_learned[key] = all_learned.get(key, []) + thought
                 medium_thoughts = []
                 for thought in thoughts:
-                    medium_thought_processor.process_thought(thought, thinker=self)
-                    medium_thoughts += medium_thought_processor.interpretations
-                    medium_thought_processor.interpretations = []
-                if medium_thoughts:
-                    print '----'*5 + ' THIRD LEVEL'
-                    for x in medium_thoughts[:100]:
-                        print x
+                   medium_thought_processor.process_thought(thought, thinker=self)
+                   medium_thoughts += medium_thought_processor.interpretations
+                   medium_thought_processor.interpretations = []
+                #if medium_thoughts:
+                #    print '----'*5 + ' THIRD LEVEL'
+                #    for x in medium_thoughts[:100]:
+                #        print x
 
-                print '----'*5
+                #print '----'*5
                 for key, val in medium_thought_processor.learned.iteritems():
-                    print key,':',val
+                    #print key,':',val
+                    all_learned[key] = all_learned.get(key, []) + val
                 learned_items |= set([x for y in thought_processor.learned.values() for x in y])
                 medium_thought_processor.learned = {}
 
                 shortest_interpretations += thoughts
+
+            #for key, val in all_learned.items():
+            #    print key, ':', list(set(val))
+            
 
             print '\n\n'
 

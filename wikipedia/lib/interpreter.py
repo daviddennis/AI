@@ -448,10 +448,12 @@ class Interpreter():
         if item:
             self.add_interpretation(before + [item] + after)
 
+
     def unigram_quantifier(self, sw, before, after):
         quantifier = get_object_or_None(Quantifier, name=sw.name)
         if quantifier:
             self.add_interpretation(before + [quantifier] + after)
+
 
     def unigram_my(self, unigram, before, after):
         my = unigram
@@ -459,11 +461,13 @@ class Interpreter():
         s = Stopword('S')
         self.add_interpretation(before + [self.user, punc, s] + after)
 
+
     def unigram_you(self, unigram, before, after):
         category, created = Category.objects.get_or_create(
             parent__name="COMPUTER PROGRAM",
             child__name="AI")
         self.add_interpretation(before + [category] + after)
+
 
     def bigram_sw(self, bigram, before, after):
         sw1, sw2 = bigram
@@ -471,24 +475,27 @@ class Interpreter():
         if sws:
             self.add_interpretation(before + [sws] + after, recurse=False)
 
+
     def bigram_exclude(self, bigram, before, after):
         self.add_interpretation(before + after)
+
 
     def bigram_the(self, bigram, before, after):
         sw, concept = bigram
         bigram = list(bigram)
         concept_as_the = get_object_or_None(Concept, name='THE ' + concept.name)
         if concept_as_the:
-            if concept.hit < 2:
-                concept.hit += 1
-                concept_as_the.hit += 1
+            if concept_as_the not in self.restrict:
+                self.restrict.add(concept_as_the)
                 self.add_interpretation(before + [concept_as_the] + after)
+
 
     def bigram_adj_c(self, bigram, before, after):
         c1, c2 = bigram
         adj = self.word_mgr.concept_to_adj(c1)
         if adj:
             self.add_interpretation(before + [adj, c2] + after)
+
 
     def bigram_q_concept(self, bigram, before, after):
         q, c1 = bigram
@@ -497,9 +504,11 @@ class Interpreter():
             concept=c1)
         self.add_interpretation(before + [amount] + after)
 
+
     def bigram_type_of(self, bigram, before, after):
         c1, sw = bigram
         self.add_interpretation(before + after)
+
 
     def bigram_a(self, bigram, before, after):
         sw, concept = bigram
@@ -509,11 +518,13 @@ class Interpreter():
             self.add_interpretation(before + [concept_as_a] + after)
         self.add_interpretation(before + [concept] + after)
 
+
     def bigram_a_verb(self, bigram, before, after):
         sw, verb = bigram
         concept_or_none = get_object_or_None(Concept, name=verb.name)
         if concept_or_none:
             self.add_interpretation(before + [sw, concept_or_none] + after)
+
 
     def bigram_are_an(self, bigram, before, after):
         concept, sws = bigram
@@ -524,12 +535,14 @@ class Interpreter():
         sw = get_object_or_None(StopwordSequence, string="is a".upper())
         if singular_concept:
             self.add_interpretation(before + [singular_concept, sw] + after)
+
         
     def bigram_recall(self, bigram, before, after):
         sw, concept = tuple(bigram)
         item = self.recall(concept.name)
         if item:
             self.add_interpretation(before + [item] + after)
+
 
     def bigram_are_a(self, bigram, before, after):
         sw_are, sw_a = bigram

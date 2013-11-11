@@ -55,6 +55,8 @@ class MediumThoughtProcessor():
                 self.bigram_ca_qfrag(bigram, before, after)
             if self.pr.recognize(bigram, "VERBCONSTRUCT CONCEPT"):
                 self.bigram_vc_c(bigram, before, after)
+            if self.pr.recognize(bigram, "VERBCONSTRUCT ADVERB"):
+                self.bigram_vc_adv(bigram, before, after)
             if self.pr.recognize(bigram, "PROPERTY VERBCONSTRUCT"):
                 self.bigram_prop_vc(bigram, before, after)
             if self.pr.recognize(bigram, "QUANTIFIER GROUP"):
@@ -172,6 +174,13 @@ class MediumThoughtProcessor():
 
     def unigram_gi(self, group_instance, before, after):
         self.reinterpret(before + [group_instance.parent_concept] + after)
+        prop, created = safe_get_or_create(Property,
+                                           parent=group_instance.child_concept,
+                                           key_concept=group_instance.parent_concept,
+                                           sub_prop=None)
+        self.add_item(prop)
+        self.reinterpret(before + [prop] + after)
+
 
     def bigram_prop_amt(self, bigram, before, after):
         prop, amount = bigram
