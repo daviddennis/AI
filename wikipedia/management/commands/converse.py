@@ -117,25 +117,25 @@ class Command(BaseCommand):
             for key, val in thought_processor.learned.iteritems():
                 #print key,':',val
                 all_learned[key] = all_learned.get(key, []) + val
-            #print thought_processor.learned.values()
+            print thought_processor.learned.values()
             learned_items |= set([x for y in thought_processor.learned.values() for x in y])
             thought_processor.learned = {}
 
             if thoughts:
-                #print '----'*5 + ' SECOND LEVEL'
-                #for thought in thoughts[:100]:
+                print '----'*5 + ' SECOND LEVEL'
+                for thought in thoughts[:100]:
                     #if isinstance(thought[0], Category):
-                    #print thought
+                    print thought
                     #all_learned[key] = all_learned.get(key, []) + thought
                 medium_thoughts = []
                 for thought in thoughts:
                    medium_thought_processor.process_thought(thought, thinker=self)
                    medium_thoughts += medium_thought_processor.interpretations
                    medium_thought_processor.interpretations = []
-                #if medium_thoughts:
-                #    print '----'*5 + ' THIRD LEVEL'
-                #    for x in medium_thoughts[:100]:
-                #        print x
+                if medium_thoughts:
+                    print '----'*5 + ' THIRD LEVEL'
+                    for x in medium_thoughts[:100]:
+                        print x
 
                 #print '----'*5
                 for key, val in medium_thought_processor.learned.iteritems():

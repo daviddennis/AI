@@ -1,0 +1,9 @@
+all [nouns]
+some [nouns]
+many [nouns]
+few [nouns]
+several [nouns]
+
+usually [verb or assertion]
+sometimes [verb or assertion]
+often [verb or assertion]
